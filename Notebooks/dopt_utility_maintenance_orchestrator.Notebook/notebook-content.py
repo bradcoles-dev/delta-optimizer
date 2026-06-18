@@ -12,23 +12,23 @@
 # MARKDOWN ********************
 
 # # dopt_utility_maintenance_orchestrator
-# # ## Purpose
+# ## Purpose
 # Iterates all tables in a Lakehouse and runs OPTIMIZE (if needed) and VACUUM (weekly or
 # forced) on each. Designed to be scheduled as a standalone pipeline, or used as a
 # starting point before per-table pipeline calls are in place.
-# # ## What it does
+# ## What it does
 # - Lists all tables in the Lakehouse via `SHOW TABLES`
-# - Runs OPTIMIZE on every table whose average file size is below the target threshold —
+# - Runs OPTIMIZE on every table whose average file size is below the target threshold -
 #   healthy tables are skipped automatically
 # - Runs VACUUM on Sundays (or immediately if `force_vacuum = True`)
-# - Catches and logs errors per table — one failing table does not stop the run
+# - Catches and logs errors per table - one failing table does not stop the run
 # - Prints a summary of tables optimized, skipped, vacuumed, and errored
-# # ## When to use this vs dopt_utility_table_maintenance
+# ## When to use this vs dopt_utility_table_maintenance
 # Use this orchestrator when you want Lakehouse-wide coverage in a single pipeline step.
 # Once pipelines are mature, prefer calling `dopt_utility_table_maintenance` as the final
-# step of each individual pipeline load — that ties maintenance to the natural cadence of
+# step of each individual pipeline load - that ties maintenance to the natural cadence of
 # each table's data changes, and avoids running across the whole Lakehouse every time.
-# # ## Prerequisites
+# ## Prerequisites
 # - This notebook must be called from a Fabric pipeline via the Notebook activity
 # - The Lakehouse GUID must be passed as a parameter
 # - For Gold tables serving Power BI Direct Lake: ensure this notebook completes **before**
@@ -37,12 +37,12 @@
 
 # PARAMETERS CELL ********************
 
-# ── Parameters ────────────────────────────────────────────────────────────────
+# -- Parameters ----------------------------------------------------------------
 # These values are overridden at runtime by the Fabric pipeline.
 # Default values below are used when running the notebook interactively.
 
 lakehouse_guid = ""     # The GUID of the Lakehouse to maintain
-target_mb      = 400    # Target average file size in MB — 256 for Silver, 400 for Gold
+target_mb      = 400    # Target average file size in MB - 256 for Silver, 400 for Gold
 force_vacuum   = False  # Set True to trigger VACUUM regardless of day of week
 
 # METADATA ********************
@@ -55,7 +55,7 @@ force_vacuum   = False  # Set True to trigger VACUUM regardless of day of week
 # MARKDOWN ********************
 
 # ## Parameters
-# # | Parameter | Type | Description |
+# | Parameter | Type | Description |
 # |---|---|---|
 # | `lakehouse_guid` | string | The GUID of the Lakehouse to maintain. Found in the Lakehouse URL in the Fabric portal |
 # | `target_mb` | integer | Target average Parquet file size in MB. Use **256** for Silver, **400** for Gold |
@@ -69,7 +69,7 @@ force_vacuum   = False  # Set True to trigger VACUUM regardless of day of week
 
 # CELL ********************
 
-# ── Validation ────────────────────────────────────────────────────────────────
+# -- Validation ----------------------------------------------------------------
 
 if not lakehouse_guid:
     raise ValueError("Parameter 'lakehouse_guid' is required but was not provided.")
@@ -88,13 +88,13 @@ print(f"Force VACUUM    : {force_vacuum}")
 # MARKDOWN ********************
 
 # ## Functions
-# # Two functions are defined below. They are called in the orchestration cell — do not
+# Two functions are defined below. They are called in the orchestration cell - do not
 # modify the function definitions unless you intend to change the maintenance logic globally.
 
 
 # CELL ********************
 
-# ── Functions ─────────────────────────────────────────────────────────────────
+# -- Functions -----------------------------------------------------------------
 
 def optimize_if_needed(fully_qualified_name, target_mb=400, tolerance=0.8):
     """
@@ -107,7 +107,7 @@ def optimize_if_needed(fully_qualified_name, target_mb=400, tolerance=0.8):
     num_files = details['numFiles']
 
     if num_files == 0:
-        print(f"  {fully_qualified_name}: skipped — no files")
+        print(f"  {fully_qualified_name}: skipped - no files")
         return "skipped"
 
     avg_file_size_mb = (details['sizeInBytes'] / num_files) / (1024**2)
@@ -115,20 +115,20 @@ def optimize_if_needed(fully_qualified_name, target_mb=400, tolerance=0.8):
 
     if avg_file_size_mb < threshold_mb:
         spark.sql(f"OPTIMIZE {fully_qualified_name}")
-        print(f"  {fully_qualified_name}: OPTIMIZE ran — avg {avg_file_size_mb:.0f}MB (target {target_mb}MB)")
+        print(f"  {fully_qualified_name}: OPTIMIZE ran - avg {avg_file_size_mb:.0f}MB (target {target_mb}MB)")
         return "optimized"
     else:
-        print(f"  {fully_qualified_name}: skipped — avg {avg_file_size_mb:.0f}MB is within tolerance")
+        print(f"  {fully_qualified_name}: skipped - avg {avg_file_size_mb:.0f}MB is within tolerance")
         return "skipped"
 
 
 def vacuum_table(fully_qualified_name, retain_hours=168):
     """
-    Runs VACUUM on a Delta table. Never runs below 168 hours (7 days) — the minimum
+    Runs VACUUM on a Delta table. Never runs below 168 hours (7 days) - the minimum
     safe retention to protect concurrent readers and Direct Lake framing.
     """
     spark.sql(f"VACUUM {fully_qualified_name} RETAIN {retain_hours} HOURS")
-    print(f"  {fully_qualified_name}: VACUUM ran — retained {retain_hours}h")
+    print(f"  {fully_qualified_name}: VACUUM ran - retained {retain_hours}h")
 
 # METADATA ********************
 
@@ -140,14 +140,14 @@ def vacuum_table(fully_qualified_name, retain_hours=168):
 # MARKDOWN ********************
 
 # ## Orchestration
-# # Iterates all tables in the Lakehouse. OPTIMIZE runs on every table that needs it.
+# Iterates all tables in the Lakehouse. OPTIMIZE runs on every table that needs it.
 # VACUUM runs on Sundays or when `force_vacuum = True`.
-# Errors on individual tables are caught and logged — the run continues regardless.
+# Errors on individual tables are caught and logged - the run continues regardless.
 
 
 # CELL ********************
 
-# ── Orchestration ─────────────────────────────────────────────────────────────
+# -- Orchestration -------------------------------------------------------------
 
 from datetime import datetime
 
@@ -162,7 +162,7 @@ error_count     = 0
 
 print(f"Tables found : {len(tables)}")
 print(f"VACUUM active: {run_vacuum}")
-print("─" * 60)
+print("-" * 60)
 
 for row in tables:
     table_name           = row.tableName
@@ -180,11 +180,11 @@ for row in tables:
             vacuumed_count += 1
 
     except Exception as e:
-        print(f"  {fully_qualified_name}: ERROR — {str(e)}")
+        print(f"  {fully_qualified_name}: ERROR - {str(e)}")
         error_count += 1
 
-print("─" * 60)
-print(f"Summary — optimized: {optimized_count} | skipped: {skipped_count} | vacuumed: {vacuumed_count} | errors: {error_count}")
+print("-" * 60)
+print(f"Summary - optimized: {optimized_count} | skipped: {skipped_count} | vacuumed: {vacuumed_count} | errors: {error_count}")
 
 # METADATA ********************
 

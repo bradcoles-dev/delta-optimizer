@@ -12,18 +12,18 @@
 # MARKDOWN ********************
 
 # # dopt_utility_table_health
-# # ## Purpose
-# Scans all tables in the attached Lakehouse and produces a health report — file counts,
+# ## Purpose
+# Scans all tables in the attached Lakehouse and produces a health report - file counts,
 # average file sizes, fragmentation status, deletion vector state, and clustering configuration.
-# # Run this notebook interactively before enabling maintenance for the first time, or any
+# Run this notebook interactively before enabling maintenance for the first time, or any
 # time you want to understand the current state of your tables before making changes.
-# # ## What it does
-# - Reads table metadata via `DESCRIBE DETAIL` for every table — no data is scanned
+# ## What it does
+# - Reads table metadata via `DESCRIBE DETAIL` for every table - no data is scanned
 # - Runs in seconds regardless of table size or row count
 # - Flags tables that need OPTIMIZE, are borderline, or are already healthy
 # - Surfaces partitioned tables (candidates for liquid clustering migration) and tables
 #   without deletion vectors enabled
-# # ## Prerequisites
+# ## Prerequisites
 # - A Lakehouse must be attached to this notebook
 # - Set `target_mb` to match the layer you are assessing before running
 
@@ -46,24 +46,24 @@ target_mb = 256     # Target average file size in MB for this layer
 # MARKDOWN ********************
 
 # ## Parameters
-# # | Parameter | Type | Description |
+# | Parameter | Type | Description |
 # |---|---|---|
 # | `target_mb` | integer | Target average Parquet file size in MB for the layer being assessed. Use **128** for Bronze, **256** for Silver, **400** for Gold. Default: `256` |
-# # ## Reading the Output
-# # | Column | What it tells you |
+# ## Reading the Output
+# | Column | What it tells you |
 # |---|---|
 # | `num_files` | High file count with low average size is the small files problem in numbers |
-# | `avg_file_mb` | Compare against the layer target — below 50% of target is a priority |
+# | `avg_file_mb` | Compare against the layer target - below 50% of target is a priority |
 # | `size_gb` | Total logical size of the table |
 # | `partitioned` | Partitioned tables are candidates for liquid clustering migration |
 # | `liquid_clustering` | Whether the table has a liquid clustering policy defined |
 # | `deletion_vectors` | Tables without deletion vectors enabled are candidates for enabling |
-# | `status` | Triage priority — sort ascending to start from the tables that need the most work |
-# # **Status values:**
-# - `Needs OPTIMIZE` — average file size is below 50% of target; priority
-# - `Review` — average file size is between 50% and 100% of target; monitor
-# - `Healthy` — average file size is at or above target
-# - `Skip — single file` — table has one file; nothing to compact
+# | `status` | Triage priority - sort ascending to start from the tables that need the most work |
+# **Status values:**
+# - `Needs OPTIMIZE` - average file size is below 50% of target; priority
+# - `Review` - average file size is between 50% and 100% of target; monitor
+# - `Healthy` - average file size is at or above target
+# - `Skip - single file` - table has one file; nothing to compact
 
 
 # CELL ********************
@@ -89,7 +89,7 @@ for row in tables:
         liquid_clustering = bool(getattr(d, "clusteringColumns", None))
 
         if num_files <= 1:
-            status = "Skip — single file"
+            status = "Skip - single file"
         elif avg_mb >= target_mb:
             status = "Healthy"
         elif avg_mb >= target_mb / 2:

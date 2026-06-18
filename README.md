@@ -97,8 +97,18 @@ Auto-detection of table type (append-only vs MERGE-heavy) to recommend and apply
 ### v1.0 — Python Package
 `pip`-installable. Works inside Fabric notebooks and local development. Stable public API. The notebook library becomes a thin wrapper over the package.
 
-### Beyond v1.0
-Productised offering under evaluation — managed deployment, workspace-level scheduling, cost analytics.
+The package exposes a clean programmatic API — `diagnose(lakehouse_guid)`, `optimize(table_name)`, `set_properties(table_name, layer)` — callable from any Python environment, not just Fabric notebooks. This is the foundation for everything above v1.0.
+
+### v2.0 — GUI
+A user-facing interface that wraps the Python package API. The practitioner enters a Lakehouse GUID, selects a layer, and clicks **Diagnose**. The tool returns the health report — file counts, fragmentation status, deletion vector state, clustering state — and surfaces specific recommendations: which tables need OPTIMIZE, which need properties set, which are healthy. The practitioner reviews and clicks **Apply**. No notebook authoring required.
+
+The most natural Fabric-native surface is a Power App or Fabric workload extension. The diagnosis → recommendation → apply loop maps directly onto the existing library:
+- Diagnose → `dopt_utility_table_health`
+- Recommend → status column logic (`Needs OPTIMIZE`, `Review`, `Healthy`)
+- Apply → `dopt_utility_maintenance_orchestrator` + `dopt_utility_set_properties_orchestrator`
+
+### Beyond v2.0 — Hosted Service
+A hosted offering where practitioners connect their Fabric workspace via OAuth. The service runs diagnosis on a schedule, surfaces the health dashboard without any notebook imports, and can apply maintenance automatically or on approval. Includes cost impact estimates — projected capacity savings from running maintenance vs. the current state.
 
 ---
 

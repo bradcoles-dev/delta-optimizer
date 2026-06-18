@@ -80,6 +80,7 @@
 
 lakehouse_guid = ""        # The GUID of the Lakehouse containing the target table
 table_name     = ""        # The table name (without schema prefix), e.g. "fact_sales"
+schema_name    = ""        # Schema name for schema-enabled Lakehouses. Leave empty for non-schema Lakehouses
 layer          = "silver"  # Medallion layer: "bronze", "silver", "gold", or "custom"
 cluster_by     = ""        # Comma-separated cluster key columns, e.g. "customer_id, order_date". "" to skip
 
@@ -104,6 +105,7 @@ custom_target_file_size_mb = 0       # delta.targetFileSize in MB; 0 to skip
 # |---|---|---|
 # | `lakehouse_guid` | string | The GUID of the Lakehouse. Found in the Lakehouse URL in the Fabric portal |
 # | `table_name` | string | Table name without schema prefix (e.g. `fact_sales`) |
+# | `schema_name` | string | Schema name for schema-enabled Lakehouses (e.g. `silver`). Leave empty for Lakehouses without schemas |
 # | `layer` | string | Accepts `"bronze"`, `"silver"`, `"gold"`, or `"custom"`. Default: `"silver"` |
 # | `cluster_by` | string | Comma-separated column names for liquid clustering (e.g. `"customer_id, order_date"`). `""` to skip. Do not use on partitioned tables |
 # | `custom_deletion_vectors` | string | **Custom mode only.** `"true"`, `"false"`, or `""` to skip |
@@ -148,9 +150,12 @@ if layer == "custom":
     if custom_target_file_size_mb < 0:
         raise ValueError(f"Parameter 'custom_target_file_size_mb' must be 0 (skip) or a positive integer. Got: {custom_target_file_size_mb}")
 
-fully_qualified_name = f"{lakehouse_guid}.{table_name}"
+workspace_guid = mssparkutils.env.getWorkspaceId()
+onelake_base   = f"abfss://{workspace_guid}@onelake.dfs.fabric.microsoft.com/{lakehouse_guid}/Tables"
+table_path     = f"{onelake_base}/{schema_name}/{table_name}" if schema_name else f"{onelake_base}/{table_name}"
+display_name   = f"{schema_name}.{table_name}" if schema_name else table_name
 
-print(f"Target table: {fully_qualified_name}")
+print(f"Target table: {display_name}")
 print(f"Layer       : {layer}")
 
 # METADATA ********************
@@ -213,16 +218,16 @@ if layer == "custom":
 else:
     props = LAYER_PROPERTIES[layer]
 
-props_str   = ", ".join(f"'{k}' = '{v}'" for k, v in props.items())
+props_str = ", ".join(f"'{k}' = '{v}'" for k, v in props.items())
 
 if props:
-    spark.sql(f"ALTER TABLE {fully_qualified_name} SET TBLPROPERTIES ({props_str})")
-    print(f"Properties set on {fully_qualified_name}:")
+    spark.sql(f"ALTER TABLE delta.`{table_path}` SET TBLPROPERTIES ({props_str})")
+    print(f"Properties set on {display_name}:")
     for k, v in props.items():
         print(f"  {k} = {v}")
 
 if cluster_by.strip():
-    spark.sql(f"ALTER TABLE {fully_qualified_name} CLUSTER BY ({cluster_by.strip()})")
+    spark.sql(f"ALTER TABLE delta.`{table_path}` CLUSTER BY ({cluster_by.strip()})")
     print(f"  liquid clustering enabled on: {cluster_by.strip()}")
     print("  Note: clustering is applied physically on the next OPTIMIZE run.")
 

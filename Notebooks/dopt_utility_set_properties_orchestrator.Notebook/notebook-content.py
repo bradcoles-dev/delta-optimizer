@@ -12,31 +12,33 @@
 # MARKDOWN ********************
 
 # # dopt_utility_set_properties_orchestrator
-# # ## Purpose
+# ## Purpose
 # Iterates all tables in a Lakehouse and calls `dopt_utility_set_table_properties` for
 # each, applying the correct Delta table properties for the given medallion layer. Run
 # this once when onboarding a Lakehouse to delta-optimizer, or after adding a batch of
 # new tables.
-# # ## What it does
-# - Lists all tables in the Lakehouse via `SHOW TABLES`
+# ## What it does
+# - Enumerates all tables via the OneLake ABFSS path — handles both schema-enabled and
+#   non-schema Lakehouses automatically
 # - Calls `dopt_utility_set_table_properties` for each table, passing the Lakehouse GUID,
-#   table name, and layer
+#   table name, schema name, and layer
 # - Catches and logs errors per table — one failing table does not stop the run
 # - Prints a summary of tables updated and errored
-# # ## When to use this vs dopt_utility_set_table_properties
+# ## When to use this vs dopt_utility_set_table_properties
 # Use this orchestrator to initialise an entire Lakehouse in one pipeline step. Once
 # tables are configured, prefer calling `dopt_utility_set_table_properties` individually
 # when adding new tables — there is no need to re-run the full Lakehouse on every change.
-# # ## One Lakehouse per layer
+# ## One Lakehouse per layer
 # This notebook assumes one Lakehouse per medallion layer, which is the standard Fabric
 # pattern. Run it once per Lakehouse, passing the matching `layer` parameter each time:
 # - Bronze Lakehouse → `layer = "bronze"`
 # - Silver Lakehouse → `layer = "silver"`
 # - Gold Lakehouse   → `layer = "gold"`
-# # ## Note on the workspace name
+# ## Note on the workspace
 # `mssparkutils.notebook.run()` identifies the target notebook by name within the same
 # Fabric workspace. Ensure `dopt_utility_set_table_properties` has been imported into
-# the same workspace as this orchestrator before running.
+# the same workspace as this orchestrator before running. Both notebooks must be in the
+# same workspace as the target Lakehouse.
 
 
 # PARAMETERS CELL ********************
@@ -83,6 +85,8 @@ if not layer or layer.lower() not in valid_layers:
 
 layer = layer.lower()
 
+workspace_guid = mssparkutils.env.getWorkspaceId()
+
 print(f"Lakehouse: {lakehouse_guid}")
 print(f"Layer    : {layer}")
 
@@ -102,9 +106,61 @@ print(f"Layer    : {layer}")
 
 # CELL ********************
 
+# ── Table enumeration ─────────────────────────────────────────────────────────
+
+def list_delta_tables(workspace_guid, lakehouse_guid):
+    """
+    Enumerates all Delta tables in a Lakehouse via ABFSS path listing.
+    Handles both schema-enabled Lakehouses (Tables/{schema}/{table}) and
+    non-schema Lakehouses (Tables/{table}) by checking for _delta_log presence.
+    Returns a list of dicts: {"schema": str, "table": str, "path": str}.
+    """
+    tables_root = f"abfss://{workspace_guid}@onelake.dfs.fabric.microsoft.com/{lakehouse_guid}/Tables"
+    result = []
+    try:
+        top_items = mssparkutils.fs.ls(tables_root)
+    except Exception as e:
+        raise RuntimeError(f"Could not list Tables directory for Lakehouse {lakehouse_guid}: {e}")
+
+    for item in top_items:
+        item_name = item.name.rstrip('/')
+        try:
+            sub_items = mssparkutils.fs.ls(item.path)
+            sub_names = [s.name.rstrip('/') for s in sub_items]
+            if "_delta_log" in sub_names:
+                result.append({"schema": "", "table": item_name, "path": item.path.rstrip('/')})
+            else:
+                # Potential schema folder — recurse one level
+                for sub_item in sub_items:
+                    sub_name = sub_item.name.rstrip('/')
+                    try:
+                        deep_items = mssparkutils.fs.ls(sub_item.path)
+                        deep_names = [d.name.rstrip('/') for d in deep_items]
+                        if "_delta_log" in deep_names:
+                            result.append({"schema": item_name, "table": sub_name, "path": sub_item.path.rstrip('/')})
+                    except:
+                        pass
+        except:
+            pass
+    return result
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# MARKDOWN ********************
+
+# ## Orchestration
+
+
+# CELL ********************
+
 # ── Orchestration ─────────────────────────────────────────────────────────────
 
-tables = spark.sql(f"SHOW TABLES IN {lakehouse_guid}").collect()
+tables = list_delta_tables(workspace_guid, lakehouse_guid)
 
 updated_count = 0
 error_count   = 0
@@ -112,8 +168,10 @@ error_count   = 0
 print(f"Tables found: {len(tables)}")
 print("-" * 60)
 
-for row in tables:
-    table_name = row.tableName
+for entry in tables:
+    schema_val   = entry["schema"]
+    table_name   = entry["table"]
+    display_name = f"{schema_val}.{table_name}" if schema_val else table_name
     try:
         mssparkutils.notebook.run(
             "dopt_utility_set_table_properties",
@@ -121,17 +179,18 @@ for row in tables:
             arguments={
                 "lakehouse_guid": lakehouse_guid,
                 "table_name":     table_name,
+                "schema_name":    schema_val,
                 "layer":          layer,
             }
         )
-        print(f"  {table_name}: properties set")
+        print(f"  {display_name}: properties set")
         updated_count += 1
     except Exception as e:
-        print(f"  {table_name}: ERROR - {str(e)}")
+        print(f"  {display_name}: ERROR — {str(e)}")
         error_count += 1
 
 print("-" * 60)
-print(f"Summary - updated: {updated_count} | errors: {error_count}")
+print(f"Summary — updated: {updated_count} | errors: {error_count}")
 
 # METADATA ********************
 

@@ -13,18 +13,22 @@
 
 # # dopt_utility_table_health
 # ## Purpose
-# Scans all tables in the attached Lakehouse and produces a health report - file counts,
-# average file sizes, fragmentation status, deletion vector state, and clustering configuration.
-# Run this notebook interactively before enabling maintenance for the first time, or any
-# time you want to understand the current state of your tables before making changes.
+# Scans all tables in a Lakehouse and produces a health report — file counts,
+# average file sizes, fragmentation status, deletion vector state, and clustering
+# configuration. Run this notebook interactively before enabling maintenance for the
+# first time, or any time you want to understand the current state of your tables
+# before making changes.
 # ## What it does
-# - Reads table metadata via `DESCRIBE DETAIL` for every table - no data is scanned
+# - Enumerates tables via the OneLake ABFSS path — no Lakehouse attachment required
+# - Reads table metadata via `DESCRIBE DETAIL` for every table — no data is scanned
 # - Runs in seconds regardless of table size or row count
 # - Flags tables that need OPTIMIZE, are borderline, or are already healthy
 # - Surfaces partitioned tables (candidates for liquid clustering migration) and tables
 #   without deletion vectors enabled
+# - Handles both schema-enabled and non-schema Lakehouses automatically
 # ## Prerequisites
-# - A Lakehouse must be attached to this notebook
+# - `lakehouse_guid` must be provided (see Parameters below)
+# - This notebook must reside in the same Fabric workspace as the target Lakehouse
 # - Set `target_mb` to match the layer you are assessing before running
 
 
@@ -34,7 +38,8 @@
 # Set target_mb to match the layer you are assessing:
 #   128 = Bronze   256 = Silver   400 = Gold
 
-target_mb = 256     # Target average file size in MB for this layer
+lakehouse_guid = ""     # The GUID of the Lakehouse to scan. Found in the Lakehouse URL in the Fabric portal
+target_mb      = 256    # Target average file size in MB for this layer
 
 # METADATA ********************
 
@@ -48,22 +53,49 @@ target_mb = 256     # Target average file size in MB for this layer
 # ## Parameters
 # | Parameter | Type | Description |
 # |---|---|---|
+# | `lakehouse_guid` | string | The GUID of the Lakehouse to scan. Found in the Lakehouse URL in the Fabric portal |
 # | `target_mb` | integer | Target average Parquet file size in MB for the layer being assessed. Use **128** for Bronze, **256** for Silver, **400** for Gold. Default: `256` |
 # ## Reading the Output
 # | Column | What it tells you |
 # |---|---|
+# | `schema` | Schema name for schema-enabled Lakehouses; empty for non-schema Lakehouses |
+# | `table` | Table name |
 # | `num_files` | High file count with low average size is the small files problem in numbers |
-# | `avg_file_mb` | Compare against the layer target - below 50% of target is a priority |
+# | `avg_file_mb` | Compare against the layer target — below 50% of target is a priority |
 # | `size_gb` | Total logical size of the table |
 # | `partitioned` | Partitioned tables are candidates for liquid clustering migration |
 # | `liquid_clustering` | Whether the table has a liquid clustering policy defined |
 # | `deletion_vectors` | Tables without deletion vectors enabled are candidates for enabling |
-# | `status` | Triage priority - sort ascending to start from the tables that need the most work |
+# | `status` | Triage priority — sort ascending to start from the tables that need the most work |
 # **Status values:**
-# - `Needs OPTIMIZE` - average file size is below 50% of target; priority
-# - `Review` - average file size is between 50% and 100% of target; monitor
-# - `Healthy` - average file size is at or above target
-# - `Skip - single file` - table has one file; nothing to compact
+# - `Needs OPTIMIZE` — average file size is below 50% of target; priority
+# - `Review` — average file size is between 50% and 100% of target; monitor
+# - `Healthy` — average file size is at or above target
+# - `Skip - single file` — table has one file; nothing to compact
+
+
+# CELL ********************
+
+# ── Validation ────────────────────────────────────────────────────────────────
+
+if not lakehouse_guid:
+    raise ValueError("Parameter 'lakehouse_guid' is required but was not provided.")
+
+workspace_guid = mssparkutils.env.getWorkspaceId()
+
+print(f"Lakehouse: {lakehouse_guid}")
+print(f"Target   : {target_mb} MB")
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# MARKDOWN ********************
+
+# ## Table Health Scan
 
 
 # CELL ********************
@@ -72,13 +104,54 @@ target_mb = 256     # Target average file size in MB for this layer
 
 from pyspark.sql import functions as F, types as T
 
-tables  = spark.sql("SHOW TABLES").collect()
+
+def list_delta_tables(workspace_guid, lakehouse_guid):
+    """
+    Enumerates all Delta tables in a Lakehouse via ABFSS path listing.
+    Handles both schema-enabled Lakehouses (Tables/{schema}/{table}) and
+    non-schema Lakehouses (Tables/{table}) by checking for _delta_log presence.
+    Returns a list of dicts: {"schema": str, "table": str, "path": str}.
+    """
+    tables_root = f"abfss://{workspace_guid}@onelake.dfs.fabric.microsoft.com/{lakehouse_guid}/Tables"
+    result = []
+    try:
+        top_items = mssparkutils.fs.ls(tables_root)
+    except Exception as e:
+        raise RuntimeError(f"Could not list Tables directory for Lakehouse {lakehouse_guid}: {e}")
+
+    for item in top_items:
+        item_name = item.name.rstrip('/')
+        try:
+            sub_items  = mssparkutils.fs.ls(item.path)
+            sub_names  = [s.name.rstrip('/') for s in sub_items]
+            if "_delta_log" in sub_names:
+                result.append({"schema": "", "table": item_name, "path": item.path.rstrip('/')})
+            else:
+                # Potential schema folder — recurse one level
+                for sub_item in sub_items:
+                    sub_name = sub_item.name.rstrip('/')
+                    try:
+                        deep_items = mssparkutils.fs.ls(sub_item.path)
+                        deep_names = [d.name.rstrip('/') for d in deep_items]
+                        if "_delta_log" in deep_names:
+                            result.append({"schema": item_name, "table": sub_name, "path": sub_item.path.rstrip('/')})
+                    except:
+                        pass
+        except:
+            pass
+    return result
+
+
+tables  = list_delta_tables(workspace_guid, lakehouse_guid)
 results = []
 
-for row in tables:
-    table_name = row.tableName
+for entry in tables:
+    schema_val   = entry["schema"]
+    table_name   = entry["table"]
+    table_path   = entry["path"]
+    display_name = f"{schema_val}.{table_name}" if schema_val else table_name
     try:
-        d          = spark.sql(f"DESCRIBE DETAIL `{table_name}`").first()
+        d          = spark.sql(f"DESCRIBE DETAIL '{table_path}'").first()
         num_files  = d.numFiles or 0
         size_bytes = d.sizeInBytes or 0
         avg_mb     = round(size_bytes / num_files / 1_048_576, 1) if num_files > 0 else 0
@@ -98,22 +171,23 @@ for row in tables:
             status = "Needs OPTIMIZE"
 
         results.append((
-            table_name, num_files,
+            schema_val, table_name, num_files,
             round(size_bytes / 1_073_741_824, 3),
             avg_mb, partitioned, liquid_clustering, dv_enabled, status
         ))
     except Exception as e:
-        results.append((table_name, None, None, None, None, None, None, f"Error: {str(e)}"))
+        results.append((schema_val, table_name, None, None, None, None, None, None, f"Error: {str(e)}"))
 
 schema = T.StructType([
-    T.StructField("table",             T.StringType()),
-    T.StructField("num_files",         T.LongType()),
-    T.StructField("size_gb",           T.DoubleType()),
-    T.StructField("avg_file_mb",       T.DoubleType()),
-    T.StructField("partitioned",       T.BooleanType()),
-    T.StructField("liquid_clustering", T.BooleanType()),
-    T.StructField("deletion_vectors",  T.BooleanType()),
-    T.StructField("status",            T.StringType()),
+    T.StructField("schema",           T.StringType()),
+    T.StructField("table",            T.StringType()),
+    T.StructField("num_files",        T.LongType()),
+    T.StructField("size_gb",          T.DoubleType()),
+    T.StructField("avg_file_mb",      T.DoubleType()),
+    T.StructField("partitioned",      T.BooleanType()),
+    T.StructField("liquid_clustering",T.BooleanType()),
+    T.StructField("deletion_vectors", T.BooleanType()),
+    T.StructField("status",           T.StringType()),
 ])
 
 display(

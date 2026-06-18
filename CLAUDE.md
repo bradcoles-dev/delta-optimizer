@@ -71,6 +71,27 @@ The file must open with:
 ### VACUUM floor
 VACUUM must never run with a retention window below 168 hours (7 days). Enforce this in code — do not rely on documentation.
 
+### ABFSS paths and same-workspace constraint
+All notebooks that reference Delta tables use ABFSS paths, not catalog-style naming (`lakehouse_guid.table_name`). The workspace GUID is derived at runtime — never passed as a parameter:
+
+```python
+workspace_guid = mssparkutils.env.getWorkspaceId()
+onelake_base   = f"abfss://{workspace_guid}@onelake.dfs.fabric.microsoft.com/{lakehouse_guid}/Tables"
+table_path     = f"{onelake_base}/{schema_name}/{table_name}" if schema_name else f"{onelake_base}/{table_name}"
+```
+
+This requires all notebooks to reside in the same Fabric workspace as the target Lakehouse. Document this constraint in any notebook header that references a Lakehouse.
+
+SQL syntax by operation:
+- `DESCRIBE DETAIL '{table_path}'`
+- `OPTIMIZE '{table_path}'`
+- `VACUUM '{table_path}' RETAIN {hours} HOURS`
+- `ALTER TABLE delta.\`{table_path}\` SET TBLPROPERTIES (...)`
+- `ALTER TABLE delta.\`{table_path}\` CLUSTER BY (...)`
+
+### Table enumeration (orchestrators and table_health)
+Never use `SHOW TABLES` for table enumeration — it requires Lakehouse attachment and does not support schema-enabled Lakehouses. Use `mssparkutils.fs.ls()` with `_delta_log` detection instead. Schema-enabled Lakehouses have a `Tables/{schema}/{table}` structure; non-schema Lakehouses have `Tables/{table}`. The `list_delta_tables()` function handles both by checking whether each top-level directory contains `_delta_log` (table) or not (schema folder, recurse one level). This function is defined identically in `dopt_utility_table_health`, `dopt_utility_maintenance_orchestrator`, and `dopt_utility_set_properties_orchestrator`.
+
 ### Deletion vectors
 Enabling `delta.enableDeletionVectors` upgrades the Delta table protocol. Always document this warning in the notebook header.
 

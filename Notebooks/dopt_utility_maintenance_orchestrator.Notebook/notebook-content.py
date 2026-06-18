@@ -17,39 +17,41 @@
 # forced) on each. Designed to be scheduled as a standalone pipeline, or used as a
 # starting point before per-table pipeline calls are in place.
 # ## What it does
-# - Lists all tables in the Lakehouse via `SHOW TABLES`
-# - Runs OPTIMIZE on every table whose average file size is below the target threshold -
+# - Enumerates all tables via the OneLake ABFSS path — handles both schema-enabled and
+#   non-schema Lakehouses automatically
+# - Runs OPTIMIZE on every table whose average file size is below the target threshold —
 #   healthy tables are skipped automatically
 # - Runs VACUUM on Sundays (or immediately if `force_vacuum = True`)
-# - Catches and logs errors per table - one failing table does not stop the run
+# - Catches and logs errors per table — one failing table does not stop the run
 # - Prints a summary of tables optimized, skipped, vacuumed, and errored
 # ## When to use this vs dopt_utility_table_maintenance
 # Use this orchestrator when you want Lakehouse-wide coverage in a single pipeline step.
 # Once pipelines are mature, prefer calling `dopt_utility_table_maintenance` as the final
-# step of each individual pipeline load - that ties maintenance to the natural cadence of
+# step of each individual pipeline load — that ties maintenance to the natural cadence of
 # each table's data changes, and avoids running across the whole Lakehouse every time.
 # ## Prerequisites
 # - This notebook must be called from a Fabric pipeline via the Notebook activity
 # - The Lakehouse GUID must be passed as a parameter
+# - This notebook must reside in the same Fabric workspace as the target Lakehouse
 # - For Gold tables serving Power BI Direct Lake: ensure this notebook completes **before**
 #   the Power BI dataset refresh is triggered
-# # ## First run on a neglected Lakehouse
+# ## First run on a neglected Lakehouse
 # If this notebook is being run for the first time on a Lakehouse that has not previously
-# had maintenance applied, the first OPTIMIZE run may be expensive — small files will have
-# accumulated across every table and all of them will fall below the compaction threshold.
-# This is expected and normal. Subsequent runs will be significantly cheaper: once tables
-# are healthy, Fast Optimize skips bins that do not need compaction and most tables will
-# be skipped entirely.
+# had maintenance applied, the first OPTIMIZE run will take longer than subsequent runs —
+# expect at least minutes per table depending on size and fragmentation. Monitor progress
+# in the Spark UI. Subsequent runs cost almost nothing when tables are already healthy:
+# once tables are healthy, Fast Optimize skips bins that do not need compaction and most
+# tables will be skipped entirely.
 
 
 # PARAMETERS CELL ********************
 
-# -- Parameters ----------------------------------------------------------------
+# ── Parameters ────────────────────────────────────────────────────────────────
 # These values are overridden at runtime by the Fabric pipeline.
 # Default values below are used when running the notebook interactively.
 
 lakehouse_guid = ""     # The GUID of the Lakehouse to maintain
-target_mb      = 400    # Target average file size in MB - 256 for Silver, 400 for Gold
+target_mb      = 400    # Target average file size in MB — 256 for Silver, 400 for Gold
 force_vacuum   = False  # Set True to trigger VACUUM regardless of day of week
 
 # METADATA ********************
@@ -76,10 +78,12 @@ force_vacuum   = False  # Set True to trigger VACUUM regardless of day of week
 
 # CELL ********************
 
-# -- Validation ----------------------------------------------------------------
+# ── Validation ────────────────────────────────────────────────────────────────
 
 if not lakehouse_guid:
     raise ValueError("Parameter 'lakehouse_guid' is required but was not provided.")
+
+workspace_guid = mssparkutils.env.getWorkspaceId()
 
 print(f"Lakehouse       : {lakehouse_guid}")
 print(f"Target file size: {target_mb} MB")
@@ -95,15 +99,52 @@ print(f"Force VACUUM    : {force_vacuum}")
 # MARKDOWN ********************
 
 # ## Functions
-# Two functions are defined below. They are called in the orchestration cell - do not
+# Three functions are defined below. They are called in the orchestration cell — do not
 # modify the function definitions unless you intend to change the maintenance logic globally.
 
 
 # CELL ********************
 
-# -- Functions -----------------------------------------------------------------
+# ── Functions ─────────────────────────────────────────────────────────────────
 
-def optimize_if_needed(fully_qualified_name, target_mb=400, tolerance=0.8):
+def list_delta_tables(workspace_guid, lakehouse_guid):
+    """
+    Enumerates all Delta tables in a Lakehouse via ABFSS path listing.
+    Handles both schema-enabled Lakehouses (Tables/{schema}/{table}) and
+    non-schema Lakehouses (Tables/{table}) by checking for _delta_log presence.
+    Returns a list of dicts: {"schema": str, "table": str, "path": str}.
+    """
+    tables_root = f"abfss://{workspace_guid}@onelake.dfs.fabric.microsoft.com/{lakehouse_guid}/Tables"
+    result = []
+    try:
+        top_items = mssparkutils.fs.ls(tables_root)
+    except Exception as e:
+        raise RuntimeError(f"Could not list Tables directory for Lakehouse {lakehouse_guid}: {e}")
+
+    for item in top_items:
+        item_name = item.name.rstrip('/')
+        try:
+            sub_items = mssparkutils.fs.ls(item.path)
+            sub_names = [s.name.rstrip('/') for s in sub_items]
+            if "_delta_log" in sub_names:
+                result.append({"schema": "", "table": item_name, "path": item.path.rstrip('/')})
+            else:
+                # Potential schema folder — recurse one level
+                for sub_item in sub_items:
+                    sub_name = sub_item.name.rstrip('/')
+                    try:
+                        deep_items = mssparkutils.fs.ls(sub_item.path)
+                        deep_names = [d.name.rstrip('/') for d in deep_items]
+                        if "_delta_log" in deep_names:
+                            result.append({"schema": item_name, "table": sub_name, "path": sub_item.path.rstrip('/')})
+                    except:
+                        pass
+        except:
+            pass
+    return result
+
+
+def optimize_if_needed(table_path, display_name, target_mb=400, tolerance=0.8):
     """
     Runs OPTIMIZE on a Delta table only if the average file size is meaningfully
     below the target. Tables already at or near the target are skipped.
@@ -111,28 +152,28 @@ def optimize_if_needed(fully_qualified_name, target_mb=400, tolerance=0.8):
     Returns a dict with result ("optimized" or "skipped") and, when optimized,
     files_before, files_after, and files_compacted for summary reporting.
     """
-    details_before   = spark.sql(f"DESCRIBE DETAIL {fully_qualified_name}").collect()[0]
+    details_before   = spark.sql(f"DESCRIBE DETAIL '{table_path}'").collect()[0]
     num_files_before = details_before['numFiles']
 
     if num_files_before == 0:
-        print(f"  {fully_qualified_name}: skipped - no files")
+        print(f"  {display_name}: skipped — no files")
         return {"result": "skipped"}
 
     avg_mb_before = (details_before['sizeInBytes'] / num_files_before) / (1024**2)
     threshold_mb  = target_mb * tolerance
 
     if avg_mb_before >= threshold_mb:
-        print(f"  {fully_qualified_name}: skipped - avg {avg_mb_before:.0f}MB is within tolerance")
+        print(f"  {display_name}: skipped — avg {avg_mb_before:.0f}MB is within tolerance")
         return {"result": "skipped"}
 
-    spark.sql(f"OPTIMIZE {fully_qualified_name}")
+    spark.sql(f"OPTIMIZE '{table_path}'")
 
-    details_after   = spark.sql(f"DESCRIBE DETAIL {fully_qualified_name}").collect()[0]
+    details_after   = spark.sql(f"DESCRIBE DETAIL '{table_path}'").collect()[0]
     num_files_after = details_after['numFiles']
     avg_mb_after    = (details_after['sizeInBytes'] / num_files_after) / (1024**2) if num_files_after > 0 else 0
     files_compacted = num_files_before - num_files_after
 
-    print(f"  {fully_qualified_name}: OPTIMIZE ran - files {num_files_before:,} → {num_files_after:,} ({files_compacted:,} compacted) | avg {avg_mb_before:.0f}MB → {avg_mb_after:.0f}MB")
+    print(f"  {display_name}: OPTIMIZE ran — files {num_files_before:,} → {num_files_after:,} ({files_compacted:,} compacted) | avg {avg_mb_before:.0f}MB → {avg_mb_after:.0f}MB")
 
     return {
         "result":          "optimized",
@@ -142,13 +183,13 @@ def optimize_if_needed(fully_qualified_name, target_mb=400, tolerance=0.8):
     }
 
 
-def vacuum_table(fully_qualified_name, retain_hours=168):
+def vacuum_table(table_path, display_name, retain_hours=168):
     """
-    Runs VACUUM on a Delta table. Never runs below 168 hours (7 days) - the minimum
+    Runs VACUUM on a Delta table. Never runs below 168 hours (7 days) — the minimum
     safe retention to protect concurrent readers and Direct Lake framing.
     """
-    spark.sql(f"VACUUM {fully_qualified_name} RETAIN {retain_hours} HOURS")
-    print(f"  {fully_qualified_name}: VACUUM ran - retained {retain_hours}h")
+    spark.sql(f"VACUUM '{table_path}' RETAIN {retain_hours} HOURS")
+    print(f"  {display_name}: VACUUM ran — retained {retain_hours}h")
 
 # METADATA ********************
 
@@ -162,35 +203,35 @@ def vacuum_table(fully_qualified_name, retain_hours=168):
 # ## Orchestration
 # Iterates all tables in the Lakehouse. OPTIMIZE runs on every table that needs it.
 # VACUUM runs on Sundays or when `force_vacuum = True`.
-# Errors on individual tables are caught and logged - the run continues regardless.
+# Errors on individual tables are caught and logged — the run continues regardless.
 
 
 # CELL ********************
 
-# -- Orchestration -------------------------------------------------------------
+# ── Orchestration ─────────────────────────────────────────────────────────────
 
 from datetime import datetime
 
 run_vacuum = force_vacuum or datetime.today().weekday() == 6  # 6 = Sunday
 
-tables = spark.sql(f"SHOW TABLES IN {lakehouse_guid}").collect()
+tables = list_delta_tables(workspace_guid, lakehouse_guid)
 
-optimized_count      = 0
-skipped_count        = 0
-vacuumed_count       = 0
-error_count          = 0
+optimized_count       = 0
+skipped_count         = 0
+vacuumed_count        = 0
+error_count           = 0
 files_compacted_total = 0
 
 print(f"Tables found : {len(tables)}")
 print(f"VACUUM active: {run_vacuum}")
 print("-" * 60)
 
-for row in tables:
-    table_name           = row.tableName
-    fully_qualified_name = f"{lakehouse_guid}.{table_name}"
+for entry in tables:
+    table_path   = entry["path"]
+    display_name = f"{entry['schema']}.{entry['table']}" if entry["schema"] else entry["table"]
 
     try:
-        result = optimize_if_needed(fully_qualified_name, target_mb=target_mb)
+        result = optimize_if_needed(table_path, display_name, target_mb=target_mb)
         if result["result"] == "optimized":
             optimized_count       += 1
             files_compacted_total += result.get("files_compacted", 0)
@@ -198,15 +239,15 @@ for row in tables:
             skipped_count += 1
 
         if run_vacuum:
-            vacuum_table(fully_qualified_name)
+            vacuum_table(table_path, display_name)
             vacuumed_count += 1
 
     except Exception as e:
-        print(f"  {fully_qualified_name}: ERROR - {str(e)}")
+        print(f"  {display_name}: ERROR — {str(e)}")
         error_count += 1
 
 print("-" * 60)
-print(f"Summary - optimized: {optimized_count} | skipped: {skipped_count} | vacuumed: {vacuumed_count} | errors: {error_count} | files compacted: {files_compacted_total:,}")
+print(f"Summary — optimized: {optimized_count} | skipped: {skipped_count} | vacuumed: {vacuumed_count} | errors: {error_count} | files compacted: {files_compacted_total:,}")
 
 # METADATA ********************
 

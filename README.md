@@ -29,6 +29,7 @@ The library is:
 | `dopt_utility_table_health` | Scans all tables in a Lakehouse and produces a health report — file counts, average file sizes, fragmentation status, deletion vector state, clustering state | Run interactively or as a pipeline step |
 | `dopt_utility_table_maintenance` | Runs OPTIMIZE (if needed) and VACUUM (weekly or forced) on a single table, parameterised by the calling pipeline | Called as the final step of each pipeline load |
 | `dopt_utility_maintenance_orchestrator` | Iterates across all tables in a Lakehouse and calls `dopt_utility_table_maintenance` for each, with layer-aware defaults | Scheduled pipeline; useful before adopting per-table pipeline calls |
+| `dopt_utility_set_table_properties` | Sets Delta table properties (deletion vectors, auto-compaction, optimize write, V-Order, target file size) on a single table. Properties persist across sessions — correct for multi-writer tables | Run once per table at setup time, or called from an onboarding pipeline |
 
 > **Status:** The library is under active development. See [Roadmap](#roadmap) below.
 
@@ -70,9 +71,7 @@ Detailed setup guides are in [`/docs`](./docs/).
 ## Roadmap
 
 ### v0.1 — Fabric Notebook Library *(current)*
-Four core notebooks covering session config, table health scanning, single-table maintenance, and Lakehouse-wide orchestration. Deployable directly into any Fabric workspace.
-
-**Known gap:** `dopt_utility_session_config` sets configs at the Spark session level, which only applies to the current notebook. For tables with multiple writers (multiple pipelines or notebooks writing to the same Silver or Gold table), Auto-Compaction and Optimize Write should be set as table properties instead — they persist across sessions and apply regardless of which notebook writes. A fifth notebook (`dopt_utility_set_table_properties`) to promote these settings to the table level is planned for a near-term v0.1 release.
+Five notebooks covering session config, table health scanning, single-table maintenance, Lakehouse-wide orchestration, and table property management. Deployable directly into any Fabric workspace.
 
 ### v0.2 — Observability
 Maintenance history logging to a Delta table. Per-table trend tracking — file count, average file size, OPTIMIZE/VACUUM run history. Enables dashboarding in Power BI.

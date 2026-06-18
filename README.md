@@ -107,8 +107,15 @@ The most natural Fabric-native surface is a Power App or Fabric workload extensi
 - Recommend → status column logic (`Needs OPTIMIZE`, `Review`, `Healthy`)
 - Apply → `dopt_utility_maintenance_orchestrator` + `dopt_utility_set_properties_orchestrator`
 
-### Beyond v2.0 — Hosted Service
-A hosted offering where practitioners connect their Fabric workspace via OAuth. The service runs diagnosis on a schedule, surfaces the health dashboard without any notebook imports, and can apply maintenance automatically or on approval. Includes cost impact estimates — projected capacity savings from running maintenance vs. the current state.
+### Beyond v2.0 — Fabric-Native App (Rayfin)
+Rather than a traditionally-hosted external service, the productised offering is a Fabric-native app built on [Rayfin](https://www.microsoft.com/en-us/microsoft-fabric/features/rayfin) — Microsoft's open-source SDK for code-first backends on Fabric (announced Build 2026).
+
+A Rayfin app removes the trust and infrastructure problems of an external hosted service:
+- The app deploys as a first-class artifact inside the user's own Fabric workspace — no OAuth, no external data transfer, governance inherited automatically
+- Health scan results land directly in OneLake, making the history table immediately available to Power BI Direct Lake with no additional pipeline work
+- The app itself can be open-sourced on top of the delta-optimizer Python package
+
+The architecture is a clean layer split: the Rayfin app handles the UI, API, and orchestration layer in Python; the delta-optimizer Python package (v1.0) handles the Spark operations underneath. Delta DDL commands (`OPTIMIZE`, `VACUUM`, `ALTER TABLE`) require Spark and always will — the Python package wraps these and is called by the Rayfin layer via the Fabric REST API or directly within a Spark context.
 
 ---
 

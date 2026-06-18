@@ -29,7 +29,7 @@ The library is:
 | `dopt_utility_table_health` | Scans all tables in a Lakehouse and produces a health report — file counts, average file sizes, fragmentation status, deletion vector state, clustering state | Run interactively or as a pipeline step |
 | `dopt_utility_table_maintenance` | Runs OPTIMIZE (if needed) and VACUUM (weekly or forced) on a single table, parameterised by the calling pipeline | Called as the final step of each pipeline load |
 | `dopt_utility_maintenance_orchestrator` | Iterates across all tables in a Lakehouse and calls `dopt_utility_table_maintenance` for each, with layer-aware defaults | Scheduled pipeline; useful before adopting per-table pipeline calls |
-| `dopt_utility_set_table_properties` | Sets Delta table properties (deletion vectors, auto-compaction, optimize write, V-Order, target file size) on a single table. Properties persist across sessions — correct for multi-writer tables | Run once per table at setup time, or called from an onboarding pipeline |
+| `dopt_utility_set_table_properties` | Sets Delta table properties (deletion vectors, auto-compaction, optimize write, V-Order) on a single table based on its medallion layer. Properties persist across sessions — correct for multi-writer tables | Run once per table at setup time, or called from an onboarding pipeline |
 
 > **Status:** The library is under active development. See [Roadmap](#roadmap) below.
 

@@ -33,11 +33,13 @@ The library is:
 | Notebook | Purpose | Typical caller |
 |---|---|---|
 | `dopt_utility_session_config` | Sets up a Spark session with the correct baseline configurations for a given medallion layer | Called at the top of every pipeline notebook |
-| `dopt_utility_table_health` | Scans all tables in a Lakehouse and produces a health report — file counts, average file sizes, fragmentation status, deletion vector state, clustering state | Run interactively or as a pipeline step |
+| `dopt_utility_table_health` | Scans all tables in a Lakehouse and produces a health report — file counts, average file sizes, fragmentation status, deletion vector state, clustering state. Pass `lakehouse_guid` as a parameter | Run interactively or as a pipeline step |
 | `dopt_utility_table_maintenance` | Runs OPTIMIZE (if needed) and VACUUM (weekly or forced) on a single table. Logs before/after file counts and average file size when OPTIMIZE runs | Called as the final step of each pipeline load |
 | `dopt_utility_maintenance_orchestrator` | Iterates all tables in a Lakehouse, running OPTIMIZE and VACUUM on each. Logs before/after metrics per table and prints a run summary including total files compacted | Scheduled pipeline; useful before adopting per-table pipeline calls |
 | `dopt_utility_set_table_properties` | Sets Delta table properties (deletion vectors, auto-compaction, optimize write, V-Order, target file size) on a single table by layer. Supports a custom mode for non-medallion tables. Optionally enables liquid clustering | Run once per table at setup time, or called from an onboarding pipeline |
 | `dopt_utility_set_properties_orchestrator` | Iterates all tables in a Lakehouse and calls `dopt_utility_set_table_properties` for each. Run once per Lakehouse at onboarding time, passing the matching `layer` for that Lakehouse | One-off onboarding pipeline; run once per medallion Lakehouse |
+
+> **Schema support:** All notebooks use ABFSS paths and handle both schema-enabled Lakehouses (`Tables/{schema}/{table}`) and non-schema Lakehouses (`Tables/{table}`) automatically.
 
 > **Status:** v0.1 is complete and ready to deploy. See [Roadmap](#roadmap) for what's coming.
 
@@ -71,13 +73,13 @@ Session configs apply only to the current notebook session. For tables written b
 
 ## Getting Started
 
-> **Prerequisites:** Microsoft Fabric workspace with a Lakehouse and Spark runtime (Runtime 1.3 or later).
+> **Prerequisites:** Microsoft Fabric workspace with a Lakehouse and Spark runtime (Runtime 1.3 or later). All notebooks must reside in the same Fabric workspace as the target Lakehouse — the workspace GUID is derived automatically at runtime via `mssparkutils.env.getWorkspaceId()`.
 
 > **Finding your Lakehouse GUID:** Open your Lakehouse in the Fabric UI and look at the browser URL. It follows the pattern `https://app.powerbi.com/groups/{workspace-guid}/lakehouses/{lakehouse-guid}`. For example: `https://app.powerbi.com/groups/6f9762f2-154f-4786-92c2-93b6b51e0401/lakehouses/4eb10241-c8b8-4778-b905-a36005890601` — the workspace GUID is `6f9762f2-...` and the Lakehouse GUID is `4eb10241-...`. The Lakehouse GUID is the `lakehouse_guid` parameter used throughout the library.
 
 1. Download or clone this repository
 2. Import the notebooks into your Fabric workspace via **Import notebook** in the Data Engineering experience
-3. Start with `dopt_utility_table_health` — run it against your Lakehouse to see the current state of your tables before changing anything
+3. Start with `dopt_utility_table_health` — pass `lakehouse_guid` as a parameter and run it to see the current state of your tables before changing anything
 4. Run `dopt_utility_set_properties_orchestrator` once per Lakehouse to set the correct Delta table properties for every table. Pass the `lakehouse_guid` and the `layer` for that Lakehouse
 5. Run `dopt_utility_maintenance_orchestrator` to compact small files and reclaim storage across all tables. On a previously unmaintained Lakehouse the first run will take longer than subsequent runs — expect at least minutes per table depending on size and fragmentation. Monitor progress in the Spark UI. Subsequent runs cost almost nothing when tables are already healthy
 6. Wire `dopt_utility_table_maintenance` as the final activity in each pipeline going forward, passing `lakehouse_guid`, `table_name`, `target_mb`, and `force_vacuum` as parameters

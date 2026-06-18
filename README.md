@@ -5,24 +5,26 @@
 
 **Production-ready Delta table maintenance for Microsoft Fabric.**
 
-Fabric capacity SKUs double in cost at every tier. Poor Delta table maintenance silently inflates that cost over time — tables accumulate small files, deletion vectors build up, liquid clustering goes stale, and queries scan far more data than they need to. The platform is working harder than it should, not because you have more data or more users, but because the tables have never been properly maintained.
+Fabric capacity SKUs double in cost at every tier. Poor Delta table maintenance silently inflates that cost over time — tables accumulate small files, [deletion vectors](docs/deletion-vectors.md) build up, [liquid clustering](docs/liquid-clustering.md) goes stale, and queries scan far more data than they need to. The platform is working harder than it should, not because you have more data or more users, but because the tables have never been properly maintained.
 
-This affects any Fabric Lakehouse, regardless of how data gets in. Whether you write with Spark notebooks, dbt-fabric, Dataflow Gen2, or Copy activity, the resulting Delta tables have identical maintenance needs. This library gives you the opinionated, medallion-aware automation to fix that.
+This affects any Fabric Lakehouse, regardless of how data gets in. Whether you write with Spark notebooks, dbt-fabric, Dataflow Gen2, or Copy activity, the resulting Delta tables have identical maintenance needs. This library gives you safe, automated Delta maintenance with layer-specific defaults for Bronze, Silver, and Gold — no per-table manual configuration required.
 
 ---
 
 ## What it is
 
-**delta-optimizer** is a Fabric Notebook Library — a set of production-ready PySpark notebooks designed to be imported directly into a Microsoft Fabric workspace. Each notebook has a single, well-defined responsibility and is designed to be called from a Fabric Data Factory pipeline or run interactively.
+**delta-optimizer** is a Fabric Notebook Library — a collection of Spark notebooks you import directly into your Fabric workspace via the **Import notebook** button in the Data Engineering experience. There is no installation command or package manager. Each notebook has a single, well-defined responsibility and is designed to be called from a Fabric Data Factory pipeline or run interactively.
 
 Delta table maintenance sits below the transformation layer — it applies to the tables themselves, not to whatever wrote them. If you use dbt-fabric, Dataflow Gen2, or Copy activity for your transformations, this library is still fully applicable. The one exception is Fabric Warehouse, which manages its own storage automatically.
 
+The design decisions behind the library — layer targets, ATFS behaviour, V-Order trade-offs, VACUUM retention — are covered in [Fabric Delta Table Maintenance](https://bradcoles.dev/blog/fabric-delta-table-maintenance.html).
+
 The library is:
 
-- **Opinionated** — sensible defaults per medallion layer (Bronze / Silver / Gold), with a custom mode for non-medallion architectures
+- **Layer-driven** — defaults are set per medallion layer (Bronze / Silver / Gold) and applied without per-table configuration; a custom mode supports non-medallion architectures
 - **Safe** — OPTIMIZE is gated on actual table health; VACUUM respects the 7-day minimum retention floor
 - **Transparent** — every decision is logged; no silent skips or silent failures
-- **Incremental** — built around Microsoft's recommended Fast Optimize, Auto-Compaction, and Adaptive Target File Size so maintenance costs almost nothing when tables are already healthy
+- **Incremental** — built around Microsoft's recommended Fast Optimize (bin-level compaction that skips already-healthy files), Auto-Compaction, and Adaptive Target File Size so maintenance costs almost nothing when tables are already healthy
 
 ---
 
@@ -37,7 +39,7 @@ The library is:
 | `dopt_utility_set_table_properties` | Sets Delta table properties (deletion vectors, auto-compaction, optimize write, V-Order, target file size) on a single table by layer. Supports a custom mode for non-medallion tables. Optionally enables liquid clustering | Run once per table at setup time, or called from an onboarding pipeline |
 | `dopt_utility_set_properties_orchestrator` | Iterates all tables in a Lakehouse and calls `dopt_utility_set_table_properties` for each. Run once per Lakehouse at onboarding time, passing the matching `layer` for that Lakehouse | One-off onboarding pipeline; run once per medallion Lakehouse |
 
-> **Status:** The library is under active development. See [Roadmap](#roadmap) below.
+> **Status:** v0.1 is complete and ready to deploy. See [Roadmap](#roadmap) for what's coming.
 
 ---
 
@@ -69,13 +71,15 @@ Session configs apply only to the current notebook session. For tables written b
 
 ## Getting Started
 
-> **Prerequisites:** Microsoft Fabric workspace with a Lakehouse and Spark runtime (Runtime 1.3 or Runtime 2.0).
+> **Prerequisites:** Microsoft Fabric workspace with a Lakehouse and Spark runtime (Runtime 1.3 or later).
+
+> **Finding your Lakehouse GUID:** Open your Lakehouse in the Fabric UI and look at the browser URL. It follows the pattern `https://app.powerbi.com/groups/{workspace-guid}/lakehouses/{lakehouse-guid}`. For example: `https://app.powerbi.com/groups/6f9762f2-154f-4786-92c2-93b6b51e0401/lakehouses/4eb10241-c8b8-4778-b905-a36005890601` — the workspace GUID is `6f9762f2-...` and the Lakehouse GUID is `4eb10241-...`. The Lakehouse GUID is the `lakehouse_guid` parameter used throughout the library.
 
 1. Download or clone this repository
 2. Import the notebooks into your Fabric workspace via **Import notebook** in the Data Engineering experience
 3. Start with `dopt_utility_table_health` — run it against your Lakehouse to see the current state of your tables before changing anything
 4. Run `dopt_utility_set_properties_orchestrator` once per Lakehouse to set the correct Delta table properties for every table. Pass the `lakehouse_guid` and the `layer` for that Lakehouse
-5. Run `dopt_utility_maintenance_orchestrator` to compact small files and reclaim storage across all tables. On a previously unmaintained Lakehouse this first run may be expensive — subsequent runs will be significantly cheaper
+5. Run `dopt_utility_maintenance_orchestrator` to compact small files and reclaim storage across all tables. On a previously unmaintained Lakehouse the first run will take longer than subsequent runs — expect at least minutes per table depending on size and fragmentation. Monitor progress in the Spark UI. Subsequent runs cost almost nothing when tables are already healthy
 6. Wire `dopt_utility_table_maintenance` as the final activity in each pipeline going forward, passing `lakehouse_guid`, `table_name`, `target_mb`, and `force_vacuum` as parameters
 7. Add a call to `dopt_utility_session_config` at the top of each pipeline notebook, passing the layer as a parameter
 
@@ -129,7 +133,7 @@ The architecture is a clean layer split: the Rayfin app handles the UI, API, and
 
 This library emerged from research published in:
 
-> **[Don't Double Your Microsoft Fabric Spend. Just Set These Configs.](https://www.linkedin.com/in/brad-coles/)** — Brad Coles
+> **[Fabric Delta Table Maintenance](https://bradcoles.dev/blog/fabric-delta-table-maintenance.html)** — Brad Coles
 
 The article covers the full theory — what Fabric does and does not automate, the right settings by medallion layer, liquid clustering vs partitioning, deletion vector management, and VACUUM retention decisions. This library is the engineering implementation of those recommendations.
 
@@ -137,7 +141,7 @@ The article covers the full theory — what Fabric does and does not automate, t
 
 ## Contributing
 
-Contributions, issues, and discussion are welcome. If you are a Fabric practitioner using this library in production, feedback on real-world behaviour is especially valuable — open an issue or start a discussion.
+Contributions, issues, and discussion are welcome. Feedback on real-world behaviour — edge cases, unexpected Spark runtime differences, table configurations that don't fit the layer model — is particularly valuable. Open an issue or start a discussion.
 
 ---
 

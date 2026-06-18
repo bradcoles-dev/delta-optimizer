@@ -38,15 +38,13 @@
 # | `delta.autoOptimize.optimizeWrite` | `false` | `true` | `true` |
 # | `delta.parquet.vorder.enabled` | `false` | `false` | `true` |
 # | `delta.targetFileSize` | 128 MB | 256 MB | 400 MB |
-#
-# ### delta.targetFileSize and ATFS
+# # ### delta.targetFileSize and ATFS
 # `delta.targetFileSize` sets a per-table ceiling. Adaptive Target File Size (ATFS),
 # enabled in `dopt_utility_session_config`, adapts that target downward for small tables —
 # preventing a 10 MB table from being compacted into a single 400 MB file. The two settings
 # work together: ATFS needs a ceiling to adapt from; this property provides it per table
 # rather than relying on a single workspace-wide default.
-#
-# The logic mirrors `dopt_utility_session_config`:
+# # The logic mirrors `dopt_utility_session_config`:
 # - **Bronze**: `optimizeWrite` is disabled — append-only batch loads do not benefit from
 #   the shuffle that optimize write introduces
 # - **Silver**: full baseline; V-Order is off because Silver tables are read by downstream

@@ -43,7 +43,7 @@
 #   the Power BI dataset refresh is triggered
 
 
-# CELL ********************
+# PARAMETERS CELL ********************
 
 # ── Parameters ────────────────────────────────────────────────────────────────
 # These values are overridden at runtime by the Fabric pipeline.

@@ -80,9 +80,13 @@ Detailed setup guides are in [`/docs`](./docs/).
 Six notebooks covering session config, table health scanning, single-table maintenance, Lakehouse-wide maintenance orchestration, table property management, and Lakehouse-wide property orchestration. Deployable directly into any Fabric workspace.
 
 ### v0.2 — Observability
-Maintenance history logging to a Delta table. Per-table trend tracking — file count, average file size, OPTIMIZE/VACUUM run history. Enables dashboarding in Power BI.
+**Health history logging.** `dopt_utility_table_health` gains an optional `history_lakehouse_guid` parameter. When provided, it appends the full Lakehouse snapshot to a `dopt_table_health_history` Delta table at the end of each run — one write, one clean timestamped snapshot per execution. When empty, the notebook behaves exactly as it does today (interactive display only), preserving the existing use case.
 
-A Fabric SQL database control table mapping `table_name → layer` is also planned for v0.2. This would allow `dopt_utility_set_properties_orchestrator` to apply per-table layer overrides (e.g. a Silver table configured with Gold properties for Direct Lake), removing the current assumption that all tables in a Lakehouse share the same layer.
+The history table schema is the existing health report columns plus `run_timestamp`. Scheduled daily, this produces a per-table trend record over time: file count, average file size, fragmentation status, deletion vector state, clustering state.
+
+**Power BI dashboard.** A Direct Lake semantic model built on `dopt_table_health_history` enables a Delta table health monitoring dashboard — trend lines per table, status breakdowns, tables that are degrading between runs. No additional infrastructure beyond the existing Lakehouse.
+
+**Control table.** A Delta table mapping `table_name → layer` to allow `dopt_utility_set_properties_orchestrator` to apply per-table layer overrides (e.g. a Silver table configured with Gold properties for Direct Lake), removing the current assumption that all tables in a Lakehouse share the same layer.
 
 ### v0.3 — Intelligence
 Auto-detection of table type (append-only vs MERGE-heavy) to recommend and apply appropriate settings. Cluster key recommendations based on column cardinality and query patterns (where accessible).

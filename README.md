@@ -16,7 +16,7 @@ The library is:
 
 - **Opinionated** — sensible defaults per medallion layer (Bronze / Silver / Gold), not a blank configuration surface
 - **Safe** — OPTIMIZE is gated on actual table health; VACUUM respects the 7-day minimum retention floor
-- **Transparent** — every decision is logged; DRY RUN support before any write operation
+- **Transparent** — every decision is logged; no silent skips or silent failures
 - **Incremental** — built around Microsoft's recommended Fast Optimize, Auto-Compaction, and Adaptive Target File Size so maintenance costs almost nothing when tables are already healthy
 
 ---
@@ -29,7 +29,7 @@ The library is:
 | `dopt_utility_table_health` | Scans all tables in a Lakehouse and produces a health report — file counts, average file sizes, fragmentation status, deletion vector state, clustering state | Run interactively or as a pipeline step |
 | `dopt_utility_table_maintenance` | Runs OPTIMIZE (if needed) and VACUUM (weekly or forced) on a single table, parameterised by the calling pipeline | Called as the final step of each pipeline load |
 | `dopt_utility_maintenance_orchestrator` | Iterates across all tables in a Lakehouse and calls `dopt_utility_table_maintenance` for each, with layer-aware defaults | Scheduled pipeline; useful before adopting per-table pipeline calls |
-| `dopt_utility_set_table_properties` | Sets Delta table properties (deletion vectors, auto-compaction, optimize write, V-Order) on a single table based on its medallion layer. Properties persist across sessions — correct for multi-writer tables | Run once per table at setup time, or called from an onboarding pipeline |
+| `dopt_utility_set_table_properties` | Sets Delta table properties (deletion vectors, auto-compaction, optimize write, V-Order) on a single table based on its medallion layer. Optionally enables liquid clustering. Properties persist across sessions — correct for multi-writer tables | Run once per table at setup time, or called from an onboarding pipeline |
 | `dopt_utility_set_properties_orchestrator` | Iterates all tables in a Lakehouse and calls `dopt_utility_set_table_properties` for each. Run once per Lakehouse at onboarding time, passing the matching `layer` for that Lakehouse | One-off onboarding pipeline; run once per medallion Lakehouse |
 
 > **Status:** The library is under active development. See [Roadmap](#roadmap) below.
@@ -53,6 +53,9 @@ For Gold tables serving Power BI Direct Lake, VACUUM must run *after* the semant
 **Session configs belong in one place.**
 The session config notebook sets the full baseline — Auto-Compaction, ATFS, Fast Optimize, File Level Compaction Target, and explicit Optimize Write and V-Order values. Per-notebook overrides apply on top. No notebook should rely on undocumented workspace defaults.
 
+**Table properties beat session configs for shared tables.**
+Session configs apply only to the current notebook session. For tables written by multiple pipelines or notebooks, Delta table properties are set once and apply regardless of which session writes. The property notebooks enforce this distinction.
+
 ---
 
 ## Getting Started
@@ -62,8 +65,10 @@ The session config notebook sets the full baseline — Auto-Compaction, ATFS, Fa
 1. Download or clone this repository
 2. Import the notebooks into your Fabric workspace via **Import notebook** in the Data Engineering experience
 3. Start with `dopt_utility_table_health` — run it against your Lakehouse to see the current state of your tables before changing anything
-4. Wire `dopt_utility_table_maintenance` as the final activity in your existing pipeline notebooks, passing `lakehouse_guid`, `table_name`, `target_mb`, and `force_vacuum` as parameters
-5. Add a call to `dopt_utility_session_config` at the top of each pipeline notebook, passing the layer as a parameter
+4. Run `dopt_utility_set_properties_orchestrator` once per Lakehouse to set the correct Delta table properties for every table. Pass the `lakehouse_guid` and the `layer` for that Lakehouse
+5. Run `dopt_utility_maintenance_orchestrator` to compact small files and reclaim storage across all tables. On a previously unmaintained Lakehouse this first run may be expensive — subsequent runs will be significantly cheaper
+6. Wire `dopt_utility_table_maintenance` as the final activity in each pipeline going forward, passing `lakehouse_guid`, `table_name`, `target_mb`, and `force_vacuum` as parameters
+7. Add a call to `dopt_utility_session_config` at the top of each pipeline notebook, passing the layer as a parameter
 
 Detailed setup guides are in [`/docs`](./docs/).
 
@@ -72,7 +77,7 @@ Detailed setup guides are in [`/docs`](./docs/).
 ## Roadmap
 
 ### v0.1 — Fabric Notebook Library *(current)*
-Five notebooks covering session config, table health scanning, single-table maintenance, Lakehouse-wide orchestration, and table property management. Deployable directly into any Fabric workspace.
+Six notebooks covering session config, table health scanning, single-table maintenance, Lakehouse-wide maintenance orchestration, table property management, and Lakehouse-wide property orchestration. Deployable directly into any Fabric workspace.
 
 ### v0.2 — Observability
 Maintenance history logging to a Delta table. Per-table trend tracking — file count, average file size, OPTIMIZE/VACUUM run history. Enables dashboarding in Power BI.

@@ -33,6 +33,14 @@
 # - The Lakehouse GUID must be passed as a parameter
 # - For Gold tables serving Power BI Direct Lake: ensure this notebook completes **before**
 #   the Power BI dataset refresh is triggered
+#
+# ## First run on a neglected Lakehouse
+# If this notebook is being run for the first time on a Lakehouse that has not previously
+# had maintenance applied, the first OPTIMIZE run may be expensive — small files will have
+# accumulated across every table and all of them will fall below the compaction threshold.
+# This is expected and normal. Subsequent runs will be significantly cheaper: once tables
+# are healthy, Fast Optimize skips bins that do not need compaction and most tables will
+# be skipped entirely.
 
 
 # PARAMETERS CELL ********************

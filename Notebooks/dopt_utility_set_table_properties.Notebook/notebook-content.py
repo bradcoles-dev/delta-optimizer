@@ -43,6 +43,15 @@
 # call this notebook with `layer = "gold"` for that table. The Gold configuration is correct
 # for any table that is the terminal layer for Direct Lake or SQL Endpoint consumers —
 # regardless of what it is named.
+# ## Liquid clustering
+# Pass a comma-separated list of column names in `cluster_by` to enable liquid clustering
+# on the table (e.g. `"customer_id, order_date"`). Leave empty to skip.
+# Liquid clustering replaces partitioning — do not enable it on a table that already uses
+# traditional `PARTITION BY`. Check the `partitioned` column in `dopt_utility_table_health`
+# before enabling.
+# Enabling clustering does not physically cluster the data. The next OPTIMIZE run (via
+# `dopt_utility_table_maintenance` or the orchestrator) applies it.
+#
 # ## Warning — deletion vectors upgrade the table protocol
 # Enabling deletion vectors upgrades the Delta table reader/writer protocol. The table will
 # not be readable by clients that do not support deletion vectors. Verify client compatibility
@@ -58,6 +67,7 @@
 lakehouse_guid = ""        # The GUID of the Lakehouse containing the target table
 table_name     = ""        # The table name (without schema prefix), e.g. "fact_sales"
 layer          = "silver"  # Medallion layer: "bronze", "silver", or "gold"
+cluster_by     = ""        # Comma-separated cluster key columns, e.g. "customer_id, order_date". "" to skip
 
 # METADATA ********************
 
@@ -74,6 +84,7 @@ layer          = "silver"  # Medallion layer: "bronze", "silver", or "gold"
 # | `lakehouse_guid` | string | The GUID of the Lakehouse. Found in the Lakehouse URL in the Fabric portal |
 # | `table_name` | string | Table name without schema prefix (e.g. `fact_sales`) |
 # | `layer` | string | The medallion layer this table belongs to. Accepts `"bronze"`, `"silver"`, or `"gold"`. Default: `"silver"` |
+# | `cluster_by` | string | Comma-separated column names to use as the liquid clustering key (e.g. `"customer_id, order_date"`). Pass `""` to skip. Do not use on partitioned tables |
 
 
 # MARKDOWN ********************
@@ -113,7 +124,8 @@ print(f"Layer       : {layer}")
 
 # ## Set Table Properties
 # Builds and executes the `ALTER TABLE SET TBLPROPERTIES` statement for the given layer.
-# All four properties are set in a single DDL call.
+# All four properties are set in a single DDL call. If `cluster_by` is provided, a
+# separate `ALTER TABLE CLUSTER BY` statement runs afterwards.
 
 
 # CELL ********************
@@ -149,6 +161,11 @@ spark.sql(f"ALTER TABLE {fully_qualified_name} SET TBLPROPERTIES ({props_str})")
 print(f"Properties set on {fully_qualified_name}:")
 for k, v in props.items():
     print(f"  {k} = {v}")
+
+if cluster_by.strip():
+    spark.sql(f"ALTER TABLE {fully_qualified_name} CLUSTER BY ({cluster_by.strip()})")
+    print(f"  liquid clustering enabled on: {cluster_by.strip()}")
+    print("  Note: clustering is applied physically on the next OPTIMIZE run.")
 
 # METADATA ********************
 

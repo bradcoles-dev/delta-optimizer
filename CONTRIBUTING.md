@@ -77,9 +77,12 @@ This library runs inside Microsoft Fabric. There is no local development environ
 
 `scripts/` contains process tooling for maintainers — not runtime code.
 
-| Script | Purpose |
-|---|---|
-| `cold-read-prompt.md` | Structured AI audit prompt for cross-file consistency checks. Run at release boundaries or after large batches of changes. Update the known-non-issues list whenever a deliberate decision would otherwise be flagged repeatedly |
+| Script | Role | When to run |
+|---|---|---|
+| `cold-read-prompt.md` | Consistency auditor — finds bugs, contradictions, and broken invariants across all files | After large batches of changes; at release boundaries |
+| `practitioner-review-prompt.md` | Skeptical practitioner — evaluates onboarding friction, unclear docs, and gaps between what is promised and delivered | Before any public release |
+| `technical-review-prompt.md` | Senior Delta/Fabric engineer — stress-tests technical decisions, SQL operations, and Spark configurations for correctness | Before any public release or after changes to maintenance logic |
+| `trust-review-prompt.md` | Cautious production adopter — evaluates transparency, risk disclosure, limitations, and production safety | Before any public release or major version bump |
 
 ---
 

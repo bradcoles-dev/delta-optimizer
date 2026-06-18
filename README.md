@@ -7,13 +7,15 @@
 
 Fabric capacity SKUs double in cost at every tier. Poor Delta table maintenance silently inflates that cost over time — tables accumulate small files, deletion vectors build up, liquid clustering goes stale, and queries scan far more data than they need to. The platform is working harder than it should, not because you have more data or more users, but because the tables have never been properly maintained.
 
-This library gives Fabric practitioners the opinionated, medallion-aware automation to fix that.
+This affects any Fabric Lakehouse, regardless of how data gets in. Whether you write with Spark notebooks, dbt-fabric, Dataflow Gen2, or Copy activity, the resulting Delta tables have identical maintenance needs. This library gives you the opinionated, medallion-aware automation to fix that.
 
 ---
 
 ## What it is
 
 **delta-optimizer** is a Fabric Notebook Library — a set of production-ready PySpark notebooks designed to be imported directly into a Microsoft Fabric workspace. Each notebook has a single, well-defined responsibility and is designed to be called from a Fabric Data Factory pipeline or run interactively.
+
+Delta table maintenance sits below the transformation layer — it applies to the tables themselves, not to whatever wrote them. If you use dbt-fabric, Dataflow Gen2, or Copy activity for your transformations, this library is still fully applicable. The one exception is Fabric Warehouse, which manages its own storage automatically.
 
 The library is:
 
@@ -46,6 +48,10 @@ Every OPTIMIZE call is gated on a metadata check (`DESCRIBE DETAIL`) — no data
 
 **Layer targets are explicit, not implicit.**
 Bronze targets 128 MB. Silver targets 256 MB. Gold targets 400 MB. These are passed as parameters, not buried in defaults.
+
+The `target_mb` parameter in the maintenance notebooks is the *threshold for whether to call OPTIMIZE* — not the output file size. Adaptive Target File Size (ATFS) controls the actual output size when OPTIMIZE runs. `dopt_utility_set_table_properties` sets `delta.targetFileSize` as a table property to give ATFS a per-table ceiling to adapt from, while ATFS adapts downward for small tables to avoid pathological results.
+
+The targets that matter most for correctness are **Silver and Gold**. Silver at 256 MB balances Spark processing efficiency for transformation workloads. Gold at 400 MB is critical — the SQL Analytics Endpoint and Power BI Direct Lake have genuine performance dependencies on file size. Bronze at 128 MB is a pragmatic default, not a hard requirement: Bronze tables are read by Spark notebooks, not by Direct Lake or the SQL Endpoint, and the difference between 80 MB and 128 MB files at Bronze has no meaningful query performance impact. The priority at Bronze is preventing small file accumulation, not hitting an exact size.
 
 **The 7-day VACUUM floor is non-negotiable.**
 VACUUM will never run with a retention window below 168 hours. The library enforces this in code — it is not a documentation note you might miss.

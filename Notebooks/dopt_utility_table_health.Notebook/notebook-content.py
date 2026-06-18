@@ -63,18 +63,24 @@ custom_target_mb = 0        # Custom mode only: target file size in MB for statu
 # | `schema` | Schema name for schema-enabled Lakehouses; empty for non-schema Lakehouses |
 # | `table` | Table name |
 # | `num_files` | High file count with low average size is the small files problem in numbers |
-# | `avg_file_mb` | Compare against the layer target — below 50% of target is a priority |
 # | `size_gb` | Total logical size of the table |
+# | `avg_file_mb` | Compare against the layer target — below 50% of target is a priority |
 # | `partitioned` | Partitioned tables are candidates for liquid clustering migration |
 # | `liquid_clustering` | Whether the table has a liquid clustering policy defined |
 # | `deletion_vectors` | Tables without deletion vectors enabled are candidates for enabling |
 # | `status` | Triage priority — sort ascending to start from the tables that need the most work |
 # **Status values:**
 # - `Needs OPTIMIZE` — average file size is below 50% of target; priority
-# - `Review` — average file size is between 50% and 100% of target; monitor
+# - `Review` — average file size is between 50% and 100% of target; monitor. Tables between 50% and 80% of target will receive OPTIMIZE from the maintenance notebooks; tables between 80% and 100% will be skipped
 # - `Healthy` — average file size is at or above target
-# - `Skip - single file` — table has one file; nothing to compact
+# - `Skip - empty table` — table has no files; may be freshly created or fully vacuumed
+# - `Skip - single file` — table has one file; nothing to compact (trivially small or already fully compacted)
 # - `No target set` — custom mode with no target specified; raw metrics only
+
+
+# MARKDOWN ********************
+
+# ## Validation
 
 
 # CELL ********************
@@ -92,6 +98,9 @@ if not layer or layer.lower() not in valid_layers:
 
 layer     = layer.lower()
 target_mb = LAYER_TARGETS.get(layer) or (custom_target_mb if custom_target_mb > 0 else None)
+
+if layer != "custom" and custom_target_mb > 0:
+    print(f"Note: 'custom_target_mb' is ignored when layer is '{layer}' — using {target_mb} MB layer default.")
 
 workspace_guid = mssparkutils.env.getWorkspaceId()
 
@@ -149,15 +158,16 @@ def list_delta_tables(workspace_guid, lakehouse_guid):
                         deep_names = [d.name.rstrip('/') for d in deep_items]
                         if "_delta_log" in deep_names:
                             result.append({"schema": item_name, "table": sub_name, "path": sub_item.path.rstrip('/')})
-                    except:
+                    except Exception:
                         pass
-        except:
-            pass
+        except Exception:
+            print(f"  Warning: could not enumerate {item.path} — skipped")
     return result
 
 
-tables  = list_delta_tables(workspace_guid, lakehouse_guid)
-results = []
+tables      = list_delta_tables(workspace_guid, lakehouse_guid)
+results     = []
+error_count = 0
 
 for entry in tables:
     schema_val   = entry["schema"]
@@ -175,7 +185,9 @@ for entry in tables:
         partitioned       = bool(d.partitionColumns)
         liquid_clustering = bool(getattr(d, "clusteringColumns", None))
 
-        if num_files <= 1:
+        if num_files == 0:
+            status = "Skip - empty table"
+        elif num_files == 1:
             status = "Skip - single file"
         elif target_mb is None:
             status = "No target set"
@@ -193,6 +205,7 @@ for entry in tables:
         ))
     except Exception as e:
         results.append((schema_val, table_name, None, None, None, None, None, None, f"Error: {str(e)}"))
+        error_count += 1
 
 schema = T.StructType([
     T.StructField("schema",           T.StringType()),
@@ -210,6 +223,9 @@ display(
     spark.createDataFrame(results, schema=schema)
     .orderBy(F.col("avg_file_mb").asc_nulls_last())
 )
+
+if error_count > 0:
+    print(f"\nWarning: {error_count} table(s) returned errors — scroll to the bottom of the results to review.")
 
 # METADATA ********************
 

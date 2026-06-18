@@ -24,6 +24,8 @@
 #   table name, schema name, and layer
 # - Catches and logs errors per table — one failing table does not stop the run
 # - Prints a summary of tables updated and errored
+# - Does not apply liquid clustering — cluster key selection is per-table and must be
+#   set via `dopt_utility_set_table_properties` directly
 # ## When to use this vs dopt_utility_set_table_properties
 # Use this orchestrator to initialise an entire Lakehouse in one pipeline step. Once
 # tables are configured, prefer calling `dopt_utility_set_table_properties` individually
@@ -39,6 +41,10 @@
 # Fabric workspace. Ensure `dopt_utility_set_table_properties` has been imported into
 # the same workspace as this orchestrator before running. Both notebooks must be in the
 # same workspace as the target Lakehouse.
+# ## Timeout
+# Each child notebook call uses `timeout_seconds=120`. Property-setting is metadata-only —
+# 120 seconds is sufficient for any OneLake-reachable table. A timeout indicates an
+# OneLake connectivity issue, not a problem with the notebook itself.
 
 
 # PARAMETERS CELL ********************
@@ -99,9 +105,9 @@ print(f"Layer    : {layer}")
 
 # MARKDOWN ********************
 
-# ## Orchestration
-# Iterates all tables in the Lakehouse and calls `dopt_utility_set_table_properties` for
-# each. Errors on individual tables are caught and logged — the run continues regardless.
+# ## Functions
+# `list_delta_tables()` enumerates all Delta tables in the Lakehouse via ABFSS path listing,
+# handling both schema-enabled and non-schema Lakehouses automatically.
 
 
 # CELL ********************
@@ -138,10 +144,10 @@ def list_delta_tables(workspace_guid, lakehouse_guid):
                         deep_names = [d.name.rstrip('/') for d in deep_items]
                         if "_delta_log" in deep_names:
                             result.append({"schema": item_name, "table": sub_name, "path": sub_item.path.rstrip('/')})
-                    except:
+                    except Exception:
                         pass
-        except:
-            pass
+        except Exception:
+            print(f"  Warning: could not enumerate {item.path} — skipped")
     return result
 
 # METADATA ********************
@@ -154,6 +160,8 @@ def list_delta_tables(workspace_guid, lakehouse_guid):
 # MARKDOWN ********************
 
 # ## Orchestration
+# Iterates all tables in the Lakehouse and calls `dopt_utility_set_table_properties` for
+# each. Errors on individual tables are caught and logged — the run continues regardless.
 
 
 # CELL ********************

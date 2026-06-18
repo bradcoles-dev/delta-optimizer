@@ -67,7 +67,7 @@ force_vacuum   = False     # Set True to trigger VACUUM regardless of day of wee
 # | Parameter | Type | Description |
 # |---|---|---|
 # | `lakehouse_guid` | string | The GUID of the Lakehouse to maintain. Found in the Lakehouse URL in the Fabric portal |
-# | `layer` | string | Medallion layer for all tables in this Lakehouse. Accepts `"bronze"`, `"silver"`, or `"gold"`. `"custom"` is not supported — all tables in a Lakehouse share the same layer. Default: `"silver"` |
+# | `layer` | string | Medallion layer for all tables in this Lakehouse. Accepts `"bronze"`, `"silver"`, or `"gold"`. `"custom"` is not supported — all tables in a Lakehouse share the same layer. Default: `"silver"`. For Lakehouses where individual tables need different target sizes, call `dopt_utility_table_maintenance` directly with `layer = "custom"` |
 # | `force_vacuum` | boolean | When `True`, VACUUM runs on all tables regardless of day. Use after large backfills or initial loads. Default: `False` |
 
 
@@ -147,10 +147,10 @@ def list_delta_tables(workspace_guid, lakehouse_guid):
                         deep_names = [d.name.rstrip('/') for d in deep_items]
                         if "_delta_log" in deep_names:
                             result.append({"schema": item_name, "table": sub_name, "path": sub_item.path.rstrip('/')})
-                    except:
+                    except Exception:
                         pass
-        except:
-            pass
+        except Exception:
+            print(f"  Warning: could not enumerate {item.path} — skipped")
     return result
 
 
@@ -169,11 +169,15 @@ def optimize_if_needed(table_path, display_name, target_mb=400, tolerance=0.8):
         print(f"  {display_name}: skipped — no files")
         return {"result": "skipped"}
 
+    if num_files_before == 1:
+        print(f"  {display_name}: skipped — single file, nothing to compact")
+        return {"result": "skipped"}
+
     avg_mb_before = (details_before['sizeInBytes'] / num_files_before) / (1024**2)
     threshold_mb  = target_mb * tolerance
 
     if avg_mb_before >= threshold_mb:
-        print(f"  {display_name}: skipped — avg {avg_mb_before:.0f}MB is within tolerance")
+        print(f"  {display_name}: skipped — avg {avg_mb_before:.0f}MB is within tolerance of {target_mb}MB target")
         return {"result": "skipped"}
 
     spark.sql(f"OPTIMIZE '{table_path}'")

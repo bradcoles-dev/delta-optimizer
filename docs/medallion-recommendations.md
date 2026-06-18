@@ -17,7 +17,7 @@ Purpose: ingest raw source data as fast as possible with minimal transformation.
 | `optimize.fileLevelTarget.enabled` | Enable (`true`) | Officially recommended by Microsoft |
 | V-Order | No action needed | Off by default in new Fabric workspaces — no Direct Lake/SQL Endpoint consumers at Bronze; write penalty not justified if enabled |
 | `delta.targetFileSize` | **128 MB** | Set as table property via `dopt_utility_set_table_properties`; gives ATFS a per-table ceiling |
-| Deletion Vectors | Enable for tables with MERGE patterns | See [deletion-vectors.md](./deletion-vectors.md) |
+| Deletion Vectors | **Enabled** | `dopt_utility_set_table_properties` enables deletion vectors unconditionally at all layers — tables with MERGE patterns benefit most. See [deletion-vectors.md](./deletion-vectors.md) |
 | Scheduled OPTIMIZE | Not needed for append-only loads; run after MERGE-heavy loads | Auto-compaction sufficient for simple appends |
 | VACUUM | Weekly, retain 168h | High write volume |
 
@@ -31,12 +31,12 @@ Purpose: cleansed, joined, business-rule-applied data. May feed Direct Lake sema
 |---|---|---|
 | `autoCompact.enabled` | Enable (`true`) | |
 | `targetFileSize.adaptive.enabled` | Enable (`true`) | |
-| `optimizeWrite.enabled` | **Leave default (`true`)** for MERGE notebooks; **disable (`false`)** for append-only batch loads | MERGE/UPDATE/DELETE operations benefit from pre-write bin packing; append-only batch loads don't |
+| `optimizeWrite.enabled` | **Leave default (`true`)** for MERGE notebooks; **disable (`false`)** for append-only batch loads | MERGE/UPDATE/DELETE operations benefit from pre-write bin packing; append-only batch loads don't. The table property is set to `true` by `dopt_utility_set_table_properties`; disable at session level for append-only pipelines — see [spark-config-utility.md](./spark-config-utility.md) |
 | `optimize.fast.enabled` | Enable (`true`) | |
 | `optimize.fileLevelTarget.enabled` | Enable (`true`) | |
 | V-Order | **Selective** | Off by default — explicitly enable via table property for tables feeding Direct Lake/SQL Endpoint. Leave off for Spark-only Silver tables |
 | `delta.targetFileSize` | **256 MB** | Set as table property via `dopt_utility_set_table_properties`; gives ATFS a per-table ceiling |
-| Deletion Vectors | Enable for tables with frequent updates | |
+| Deletion Vectors | **Enabled** | `dopt_utility_set_table_properties` enables deletion vectors unconditionally at all layers — tables with frequent updates benefit most |
 | Liquid Clustering | **Recommended** | Preferred over partitioning for new Silver tables; use Z-Order only on already-partitioned tables |
 | Scheduled OPTIMIZE | **Run aggressively** | Auto-compaction alone is insufficient for SQL/BI consumers; run after each load or on a schedule |
 | VACUUM | Weekly, retain 168h | |
@@ -51,12 +51,12 @@ Purpose: aggregated, presentation-ready data. Primary source for Power BI Direct
 |---|---|---|
 | `autoCompact.enabled` | Enable (`true`) | |
 | `targetFileSize.adaptive.enabled` | Enable (`true`) | |
-| `optimizeWrite.enabled` | **Leave default (`true`)** for MERGE notebooks; **disable (`false`)** for append-only batch loads | Same rule as Silver — MERGE notebooks exist at every layer |
+| `optimizeWrite.enabled` | **Leave default (`true`)** for MERGE notebooks; **disable (`false`)** for append-only batch loads | Same rule as Silver — MERGE notebooks exist at every layer. The table property is set to `true`; disable at session level for append-only pipelines — see [spark-config-utility.md](./spark-config-utility.md) |
 | `optimize.fast.enabled` | Enable (`true`) | Has no effect on Liquid Clustered tables — full OPTIMIZE always runs there |
 | `optimize.fileLevelTarget.enabled` | Enable (`true`) | |
 | V-Order | **Enable** | Off by default in new Fabric workspaces — explicitly enable at session level for all Gold notebooks; use `OPTIMIZE VORDER` to re-encode existing files |
 | `delta.targetFileSize` | **400 MB** | Set as table property via `dopt_utility_set_table_properties`; gives ATFS a per-table ceiling |
-| Deletion Vectors | Enable; minimise accumulation via regular compaction | Accumulated deletion vectors add overhead to Direct Lake cold-state loading |
+| Deletion Vectors | **Enabled** | `dopt_utility_set_table_properties` enables deletion vectors unconditionally at all layers. Minimise accumulation via regular compaction — accumulated vectors add overhead to Direct Lake cold-state loading |
 | Liquid Clustering | **Required** | Optimal file skipping for Gold consumers; data is only clustered when OPTIMIZE runs |
 | Scheduled OPTIMIZE | **Run aggressively** | Required for Liquid Clustering to take effect, Direct Lake deletion vector cleanup, and hitting 400 MB–1 GB file size targets |
 | VACUUM | Weekly, retain 168h | Respect Direct Lake framing window before running |

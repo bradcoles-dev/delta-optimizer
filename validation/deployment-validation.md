@@ -36,30 +36,58 @@ Validates layer-driven Spark session configuration.
 |---|---|
 | `layer` | `bronze` |
 
-**Expected:** `Baseline configuration applied.` then `Bronze override applied: Optimize Write disabled (append-only batch loads).`
+**Expected:**
+```
+Layer: bronze
+Baseline configuration applied.
+Bronze override applied: Optimize Write disabled (append-only batch loads).
+
+Session configuration complete for layer: bronze
+```
 
 ### 1.2 — Silver
 | Parameter | Value |
 |---|---|
 | `layer` | `silver` |
 
-**Expected:** `Baseline configuration applied.` then `Silver: no overrides - baseline is correct for this layer.`
+**Expected:**
+```
+Layer: silver
+Baseline configuration applied.
+Silver: no overrides - baseline is correct for this layer.
+
+Session configuration complete for layer: silver
+```
 
 ### 1.3 — Gold
 | Parameter | Value |
 |---|---|
 | `layer` | `gold` |
 
-**Expected:** `Baseline configuration applied.` then `Gold override applied: V-Order enabled (Direct Lake and SQL Endpoint consumers).`
+**Expected:**
+```
+Layer: gold
+Baseline configuration applied.
+Gold override applied: V-Order enabled (Direct Lake and SQL Endpoint consumers).
+
+Session configuration complete for layer: gold
+```
 
 ### 1.4 — Custom
 | Parameter | Value |
 |---|---|
 | `layer` | `custom` |
-| `custom_optimize_write` | `True` |
-| `custom_v_order` | `False` |
+| `custom_optimize_write` | `true` |
+| `custom_v_order` | `false` |
 
-**Expected:** `Custom override applied: Optimize Write = True, V-Order = False.`
+**Expected:**
+```
+Layer: custom
+Baseline configuration applied.
+Custom override applied: Optimize Write = true, V-Order = false.
+
+Session configuration complete for layer: custom
+```
 
 ### 1.5 — Invalid layer
 | Parameter | Value |
@@ -83,7 +111,7 @@ Validates table enumeration, health metrics, and status classification. This is 
 **Expected:**
 - One row per Delta table in the Lakehouse
 - `num_files`, `avg_file_mb`, `size_gb` populated for all tables
-- `status` is one of: `Healthy`, `Review`, `Needs OPTIMIZE`, `Skip - single file`
+- `status` is one of: `Healthy`, `Review`, `Needs OPTIMIZE`, `Skip - single file`, `Skip - empty table` (zero-file tables), `No target set` (custom mode without a target MB specified)
 - `schema` column is empty (non-schema Lakehouse)
 - Run completes in seconds — no data scan
 
@@ -156,7 +184,11 @@ delta.targetFileSize = 268435456
 | `layer` | `gold` |
 | `cluster_by` | A column name that exists in the table |
 
-**Expected:** Properties set, followed by `liquid clustering enabled on: {column}` and a note that clustering is applied on the next OPTIMIZE run.
+**Expected:** Properties set, followed by (note two leading spaces on the clustering lines):
+```
+  liquid clustering enabled on: {column}
+  Note: clustering is applied physically on the next OPTIMIZE run.
+```
 
 **Verify:** Re-run `dopt_utility_table_health` — the table should show `liquid_clustering = true`.
 
@@ -215,7 +247,7 @@ Select a table showing `Needs OPTIMIZE` in the `dopt_utility_table_health` outpu
 |---|---|
 | `lakehouse_guid` | Your Lakehouse GUID |
 | `table_name` | A fragmented table |
-| `target_mb` | `256` |
+| `layer` | `silver` |
 
 **Expected:**
 - OPTIMIZE runs
@@ -229,7 +261,7 @@ Select a table showing `Healthy` in the health report.
 |---|---|
 | `lakehouse_guid` | Your Lakehouse GUID |
 | `table_name` | A healthy table |
-| `target_mb` | `256` |
+| `layer` | `silver` |
 
 **Expected:** `{table}: skipped — avg XMB is within tolerance of 256MB target`
 
@@ -238,7 +270,7 @@ Select a table showing `Healthy` in the health report.
 |---|---|
 | `lakehouse_guid` | Your Lakehouse GUID |
 | `table_name` | Any table |
-| `target_mb` | `256` |
+| `layer` | `silver` |
 | `force_vacuum` | `True` |
 
 **Expected:** VACUUM runs regardless of day. Output: `{table}: VACUUM ran — retained 168h`
@@ -249,9 +281,21 @@ Select a table showing `Healthy` in the health report.
 | `lakehouse_guid` | Your schema-enabled Lakehouse GUID |
 | `table_name` | Table name without schema prefix |
 | `schema_name` | The schema the table lives in |
-| `target_mb` | `256` |
+| `layer` | `silver` |
 
 **Expected:** Same behaviour as 5.1–5.3. The ABFSS path in the notebook output will include the schema segment.
+
+### 5.5 — Custom layer
+| Parameter | Value |
+|---|---|
+| `lakehouse_guid` | Your Lakehouse GUID |
+| `table_name` | Any table |
+| `layer` | `custom` |
+| `custom_target_mb` | `300` |
+
+**Expected:** Same OPTIMIZE gating behaviour as 5.1–5.2 using 300 MB as the threshold.
+
+**Error case:** Set `custom_target_mb = 0` with `layer = "custom"`. **Expected:** `ValueError` raised immediately — `custom_target_mb` is required for custom mode.
 
 ---
 
@@ -263,13 +307,13 @@ Validates Lakehouse-wide maintenance, summary accuracy, and error resilience.
 | Parameter | Value |
 |---|---|
 | `lakehouse_guid` | Your Lakehouse GUID |
-| `target_mb` | `256` |
+| `layer` | `silver` |
 | `force_vacuum` | `False` |
 
 **Expected:**
 - `Tables found: N` matches the count from `dopt_utility_table_health`
 - Each table logs `skipped` or `OPTIMIZE ran` with file counts
-- Summary: `optimized: X | skipped: Y | vacuumed: 0 | errors: 0 | files compacted: Z`
+- Summary: `optimized: X | skipped: Y | vacuumed: 0 | errors: 0 | files compacted: Z` (if not run on a Sunday — on Sunday VACUUM fires automatically and `vacuumed` will equal N)
 - X + Y = N
 
 **Cross-check:** Re-run `dopt_utility_table_health` — previously fragmented tables should now show `Healthy` or `Review`.
@@ -278,7 +322,7 @@ Validates Lakehouse-wide maintenance, summary accuracy, and error resilience.
 | Parameter | Value |
 |---|---|
 | `lakehouse_guid` | Your Lakehouse GUID |
-| `target_mb` | `256` |
+| `layer` | `silver` |
 | `force_vacuum` | `True` |
 
 **Expected:** Summary shows `vacuumed: N` where N equals total tables.
@@ -318,6 +362,6 @@ Run `dopt_utility_maintenance_orchestrator` with the schema-enabled Lakehouse GU
 | 2 | Table health | Scan, layer targets, custom mode, missing param | ☐ |
 | 3 | Set table properties | All layers, clustering, custom mode, missing param | ☐ |
 | 4 | Set properties orchestrator | Full run, error resilience | ☐ |
-| 5 | Table maintenance | OPTIMIZE triggers, skip, forced VACUUM | ☐ |
+| 5 | Table maintenance | OPTIMIZE triggers, skip, forced VACUUM, custom layer | ☐ |
 | 6 | Maintenance orchestrator | Full run, forced VACUUM | ☐ |
 | 7 | Schema-enabled Lakehouses *(optional)* | Health scan, orchestrator | ☐ |

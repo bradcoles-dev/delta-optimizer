@@ -167,8 +167,11 @@ print(f"Layer       : {layer}")
 
 # ## Set Table Properties
 # Builds and executes the `ALTER TABLE SET TBLPROPERTIES` statement for the given layer.
-# All four properties are set in a single DDL call. If `cluster_by` is provided, a
-# separate `ALTER TABLE CLUSTER BY` statement runs afterwards.
+# If `cluster_by` is provided, the table's partition columns are checked **before** any
+# modifications are applied — liquid clustering and traditional partitioning cannot be
+# combined, and this guard ensures no DDL runs on an invalid configuration. Properties
+# are then set in a single DDL call, followed by `ALTER TABLE CLUSTER BY` if clustering
+# was requested.
 
 
 # CELL ********************
@@ -218,12 +221,6 @@ else:
 
 props_str = ", ".join(f"'{k}' = '{v}'" for k, v in props.items())
 
-if props:
-    spark.sql(f"ALTER TABLE delta.`{table_path}` SET TBLPROPERTIES ({props_str})")
-    print(f"Properties set on {display_name}:")
-    for k, v in props.items():
-        print(f"  {k} = {v}")
-
 if cluster_by.strip():
     detail = spark.sql(f"DESCRIBE DETAIL '{table_path}'").first()
     if detail.partitionColumns:
@@ -232,6 +229,14 @@ if cluster_by.strip():
             "Liquid clustering and traditional partitioning cannot be combined. "
             "To migrate: rewrite the table without PARTITION BY, then re-run with cluster_by."
         )
+
+if props:
+    spark.sql(f"ALTER TABLE delta.`{table_path}` SET TBLPROPERTIES ({props_str})")
+    print(f"Properties set on {display_name}:")
+    for k, v in props.items():
+        print(f"  {k} = {v}")
+
+if cluster_by.strip():
     spark.sql(f"ALTER TABLE delta.`{table_path}` CLUSTER BY ({cluster_by.strip()})")
     print(f"  liquid clustering enabled on: {cluster_by.strip()}")
     print("  Note: clustering is applied physically on the next OPTIMIZE run.")

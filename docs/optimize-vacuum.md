@@ -66,6 +66,8 @@ def optimize_if_needed(table_path, target_mb=400, tolerance=0.8):
         print(f"{table_path}: skipped — avg file size {avg_file_size_mb:.0f}MB is within tolerance of {target_mb}MB target")
 ```
 
+> This is a simplified example. The full implementation in `dopt_utility_table_maintenance` includes before/after file count metrics, a result dict for summary reporting, and a single-file skip.
+
 To run OPTIMIZE and VACUUM across all tables in a Lakehouse, use `dopt_utility_maintenance_orchestrator`. It enumerates tables via `mssparkutils.fs.ls()` with `_delta_log` detection — no `SHOW TABLES` required, and handles both schema-enabled and non-schema Lakehouses automatically.
 
 **Notes:**

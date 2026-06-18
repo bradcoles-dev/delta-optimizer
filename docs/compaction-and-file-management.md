@@ -63,7 +63,9 @@ This pairs well with ATFS: as ATFS adapts the target size, File Level Target pre
 
 ## Practical Implication: No Nightly OPTIMIZE Required
 
-For tables with active ongoing writes (which covers all medallion layers in a typical pipeline), auto-compaction + ATFS handles file sizing continuously. A scheduled nightly `OPTIMIZE` job is **not needed** for routine file management.
+For **Bronze append-only** tables with active ongoing writes, auto-compaction + ATFS handles file sizing continuously. A scheduled nightly `OPTIMIZE` job is **not needed** for routine file management.
+
+**Silver and Gold are different.** Auto-compaction targets 128 MB by default; Silver and Gold consumers (SQL Analytics Endpoint, Power BI Direct Lake) need 256–400 MB files. Liquid Clustering only applies physically when OPTIMIZE runs. Deletion vectors accumulate and must be resolved. For Silver and Gold, scheduled OPTIMIZE is still recommended — see [optimize-vacuum.md](./optimize-vacuum.md) for guidance.
 
 ## Fabric Defaults Note
 

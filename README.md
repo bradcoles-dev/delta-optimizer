@@ -37,7 +37,7 @@ The library is:
 | `dopt_utility_table_maintenance` | Runs OPTIMIZE (if needed) and VACUUM (weekly or forced) on a single table. Logs before/after file counts and average file size when OPTIMIZE runs | Called as the final step of each pipeline load |
 | `dopt_utility_maintenance_orchestrator` | Iterates all tables in a Lakehouse, running OPTIMIZE and VACUUM on each. Logs before/after metrics per table and prints a run summary including total files compacted | Scheduled pipeline; useful before adopting per-table pipeline calls |
 | `dopt_utility_set_table_properties` | Sets Delta table properties (deletion vectors, auto-compaction, optimize write, V-Order, target file size) on a single table by layer. Supports a custom mode for non-medallion tables. Optionally enables liquid clustering | Run once per table at setup time, or called from an onboarding pipeline |
-| `dopt_utility_set_properties_orchestrator` | Iterates all tables in a Lakehouse and calls `dopt_utility_set_table_properties` for each. Run once per Lakehouse at onboarding time, passing the matching `layer` for that Lakehouse | One-off onboarding pipeline; run once per medallion Lakehouse |
+| `dopt_utility_set_properties_orchestrator` | Iterates all tables in a Lakehouse and calls `dopt_utility_set_table_properties` for each. Run once per Lakehouse at onboarding time, passing the matching `layer` for that Lakehouse. Does not apply liquid clustering — cluster keys are per-table and must be set via `dopt_utility_set_table_properties` directly | One-off onboarding pipeline; run once per medallion Lakehouse |
 
 > **Schema support:** All notebooks use ABFSS paths and handle both schema-enabled Lakehouses (`Tables/{schema}/{table}`) and non-schema Lakehouses (`Tables/{table}`) automatically.
 
@@ -83,7 +83,9 @@ Session configs apply only to the current notebook session. For tables written b
 4. Run `dopt_utility_set_properties_orchestrator` once per Lakehouse to set the correct Delta table properties for every table. Pass the `lakehouse_guid` and the `layer` for that Lakehouse
 5. Run `dopt_utility_maintenance_orchestrator` to compact small files and reclaim storage across all tables. On a previously unmaintained Lakehouse the first run will take longer than subsequent runs — expect at least minutes per table depending on size and fragmentation. Monitor progress in the Spark UI. Subsequent runs cost almost nothing when tables are already healthy
 6. Add a call to `dopt_utility_session_config` at the top of each pipeline notebook, passing the layer as a parameter
-7. Wire `dopt_utility_table_maintenance` as the final activity in each pipeline going forward, passing `lakehouse_guid`, `table_name`, `schema_name`, `layer`, and `force_vacuum` as parameters
+7. Wire `dopt_utility_table_maintenance` as the final activity in each pipeline going forward. Required parameters: `lakehouse_guid`, `table_name`, `layer`. Optional: `schema_name` (schema-enabled Lakehouses only), `force_vacuum` (default `False`; set `True` for ad-hoc runs after large backfills). When `layer = "custom"`, `custom_target_mb` is also required — must be a positive integer specifying the target file size in MB
+
+> **Pipeline return values:** These notebooks print all decisions to Spark stdout (visible in pipeline run logs) but do not return structured values via `mssparkutils.notebook.exit()`. Pipeline branching on individual maintenance outcomes is not currently supported.
 
 Detailed setup guides are in [`/docs`](./docs/).
 

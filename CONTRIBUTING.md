@@ -59,7 +59,7 @@ Check the [Roadmap](./README.md#roadmap) in the README first — your idea may a
 ### Documentation conventions
 
 - Reference docs live in `docs/` — update the relevant doc if your change affects documented behaviour
-- Keep the `docs/medallion-recommendations.md` quick reference in sync with any setting changes
+- Keep the `docs/medallion-recommendations.md` quick reference in sync with any setting changes — the source of truth is `LAYER_PROPERTIES` in `dopt_utility_set_table_properties` and the baseline cell in `dopt_utility_session_config`
 
 ---
 

@@ -58,13 +58,15 @@ spark.conf.set("spark.sql.parquet.vorder.default", "false")
 
 ### 3. Table property (lowest precedence for writes; persists across sessions)
 
+(`{table_path}` = `abfss://{workspace_guid}@onelake.dfs.fabric.microsoft.com/{lakehouse_guid}/Tables/{table_name}`)
+
 ```sql
 -- Enable on a specific Silver or Gold table
-ALTER TABLE my_catalog.silver.my_table
+ALTER TABLE delta.`{table_path}`
 SET TBLPROPERTIES ('delta.parquet.vorder.enabled' = 'true');
 
 -- Disable on a specific table
-ALTER TABLE my_catalog.silver.my_table
+ALTER TABLE delta.`{table_path}`
 SET TBLPROPERTIES ('delta.parquet.vorder.enabled' = 'false');
 ```
 
@@ -75,13 +77,13 @@ SET TBLPROPERTIES ('delta.parquet.vorder.enabled' = 'false');
 V-Order only applies to newly-written Parquet files. To re-encode existing files — for example when first enabling V-Order on a Gold table — run `OPTIMIZE VORDER`. This applies V-Order regardless of session and table property settings:
 
 ```sql
-OPTIMIZE my_catalog.gold.my_table VORDER;
+OPTIMIZE '{table_path}' VORDER;
 ```
 
 You can combine with Z-Order:
 
 ```sql
-OPTIMIZE my_catalog.gold.my_table ZORDER BY (customer_id) VORDER;
+OPTIMIZE '{table_path}' ZORDER BY (customer_id) VORDER;
 ```
 
 ## Note on the Session Config Notebook

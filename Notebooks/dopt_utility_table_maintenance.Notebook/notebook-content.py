@@ -173,6 +173,10 @@ def optimize_if_needed(table_path, display_name, target_mb=400, tolerance=0.8):
         print(f"{display_name}: skipped — no files")
         return {"result": "skipped"}
 
+    if num_files_before == 1:
+        print(f"{display_name}: skipped — single file, nothing to compact")
+        return {"result": "skipped"}
+
     avg_mb_before = (details_before['sizeInBytes'] / num_files_before) / (1024**2)
     threshold_mb  = target_mb * tolerance
 

@@ -29,17 +29,18 @@
 # ## Prerequisites
 # - `lakehouse_guid` must be provided (see Parameters below)
 # - This notebook must reside in the same Fabric workspace as the target Lakehouse
-# - Set `target_mb` to match the layer you are assessing before running
+# - Set `layer` to match the layer you are assessing before running
 
 
 # PARAMETERS CELL ********************
 
 # ── Parameters ────────────────────────────────────────────────────────────────
-# Set target_mb to match the layer you are assessing:
-#   128 = Bronze   256 = Silver   400 = Gold
+# These values are overridden at runtime by the Fabric pipeline.
+# Default values below are used when running the notebook interactively.
 
-lakehouse_guid = ""     # The GUID of the Lakehouse to scan. Found in the Lakehouse URL in the Fabric portal
-target_mb      = 256    # Target average file size in MB for this layer
+lakehouse_guid   = ""       # The GUID of the Lakehouse to scan. Found in the Lakehouse URL in the Fabric portal
+layer            = "silver" # Medallion layer: "bronze", "silver", "gold", or "custom"
+custom_target_mb = 0        # Custom mode only: target file size in MB for status classification. 0 to skip status
 
 # METADATA ********************
 
@@ -54,7 +55,8 @@ target_mb      = 256    # Target average file size in MB for this layer
 # | Parameter | Type | Description |
 # |---|---|---|
 # | `lakehouse_guid` | string | The GUID of the Lakehouse to scan. Found in the Lakehouse URL in the Fabric portal |
-# | `target_mb` | integer | Target average Parquet file size in MB for the layer being assessed. Use **128** for Bronze, **256** for Silver, **400** for Gold. Default: `256` |
+# | `layer` | string | Medallion layer being assessed. Accepts `"bronze"`, `"silver"`, `"gold"`, or `"custom"`. Default: `"silver"` |
+# | `custom_target_mb` | integer | **Custom mode only.** Target file size in MB for status classification. `0` to omit status classification |
 # ## Reading the Output
 # | Column | What it tells you |
 # |---|---|
@@ -72,19 +74,31 @@ target_mb      = 256    # Target average file size in MB for this layer
 # - `Review` — average file size is between 50% and 100% of target; monitor
 # - `Healthy` — average file size is at or above target
 # - `Skip - single file` — table has one file; nothing to compact
+# - `No target set` — custom mode with no target specified; raw metrics only
 
 
 # CELL ********************
 
 # ── Validation ────────────────────────────────────────────────────────────────
 
+valid_layers  = {"bronze", "silver", "gold", "custom"}
+LAYER_TARGETS = {"bronze": 128, "silver": 256, "gold": 400}
+
 if not lakehouse_guid:
     raise ValueError("Parameter 'lakehouse_guid' is required but was not provided.")
+
+if not layer or layer.lower() not in valid_layers:
+    raise ValueError(f"Parameter 'layer' must be one of: {', '.join(sorted(valid_layers))}. Got: '{layer}'")
+
+layer     = layer.lower()
+target_mb = LAYER_TARGETS.get(layer) or (custom_target_mb if custom_target_mb > 0 else None)
 
 workspace_guid = mssparkutils.env.getWorkspaceId()
 
 print(f"Lakehouse: {lakehouse_guid}")
-print(f"Target   : {target_mb} MB")
+print(f"Layer    : {layer}")
+if target_mb:
+    print(f"Target   : {target_mb} MB")
 
 # METADATA ********************
 
@@ -163,6 +177,8 @@ for entry in tables:
 
         if num_files <= 1:
             status = "Skip - single file"
+        elif target_mb is None:
+            status = "No target set"
         elif avg_mb >= target_mb:
             status = "Healthy"
         elif avg_mb >= target_mb / 2:

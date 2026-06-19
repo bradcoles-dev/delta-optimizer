@@ -1,4 +1,4 @@
----
+﻿---
 name: Bug report
 about: Something behaves unexpectedly or produces incorrect results
 title: '[Bug] '
@@ -7,7 +7,7 @@ assignees: ''
 ---
 
 **Which notebook(s) are involved?**
-e.g. `dopt_utility_table_maintenance`, `dopt_utility_table_health`
+e.g. `doctor_treatment_table_maintenance`, `doctor_diagnosis_table_health`
 
 **What did you expect to happen?**
 

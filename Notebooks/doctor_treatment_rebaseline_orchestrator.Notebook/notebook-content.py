@@ -11,7 +11,7 @@
 
 # MARKDOWN ********************
 
-# # dopt_utility_rebaseline_orchestrator
+# # doctor_treatment_rebaseline_orchestrator
 # ## Purpose
 # Runs a one-off rebaseline across all tables in a Lakehouse. Designed to be run
 # once on a Lakehouse that has not previously had Delta maintenance applied — or any
@@ -27,10 +27,10 @@
 # - Prints before/after file counts and average file size per table, and a run summary
 # ## When to use this
 # Run this notebook **once** as part of the onboarding sequence:
-# 1. Run `dopt_utility_set_properties_orchestrator` to set `delta.targetFileSize` and
+# 1. Run `doctor_prevention_set_properties_orchestrator` to set `delta.targetFileSize` and
 #    other table properties across all tables
 # 2. Run this notebook to rebaseline file sizes across the Lakehouse
-# 3. Switch to `dopt_utility_maintenance_orchestrator` (or `dopt_utility_table_maintenance`
+# 3. Switch to `doctor_treatment_maintenance_orchestrator` (or `doctor_treatment_table_maintenance`
 #    per pipeline) for ongoing maintenance going forward
 # Do not include this notebook in a recurring pipeline — it performs a full rewrite of
 # every table and is expensive to run repeatedly.
@@ -41,10 +41,10 @@
 # ## Warning — deletion vectors upgrade the table protocol
 # REORG APPLY (PURGE) purges deletion vectors. Ensure clients reading these tables
 # support deletion vectors before running. If deletion vectors have not yet been enabled
-# via `dopt_utility_set_table_properties`, REORG has no deletion vectors to purge —
+# via `doctor_prevention_set_table_properties`, REORG has no deletion vectors to purge —
 # it still rewrites and right-sizes the files.
 # ## Prerequisites
-# - `dopt_utility_set_properties_orchestrator` must have been run first to set
+# - `doctor_prevention_set_properties_orchestrator` must have been run first to set
 #   `delta.targetFileSize` as a table property — this gives ATFS the per-table ceiling
 #   it needs to right-size files correctly during OPTIMIZE
 # - This notebook must reside in the same Fabric workspace as the target Lakehouse

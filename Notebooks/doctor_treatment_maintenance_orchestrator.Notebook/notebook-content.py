@@ -11,7 +11,7 @@
 
 # MARKDOWN ********************
 
-# # dopt_utility_maintenance_orchestrator
+# # doctor_treatment_maintenance_orchestrator
 # ## Purpose
 # Iterates all tables in a Lakehouse and runs OPTIMIZE (if needed) and VACUUM (weekly or
 # forced) on each. Designed to be scheduled as a standalone pipeline, or used as a
@@ -24,9 +24,9 @@
 # - Runs VACUUM on Sundays (or immediately if `force_vacuum = True`)
 # - Catches and logs errors per table — one failing table does not stop the run
 # - Prints a summary of tables optimized, skipped, vacuumed, and errored
-# ## When to use this vs dopt_utility_table_maintenance
+# ## When to use this vs doctor_treatment_table_maintenance
 # Use this orchestrator when you want Lakehouse-wide coverage in a single pipeline step.
-# Once pipelines are mature, prefer calling `dopt_utility_table_maintenance` as the final
+# Once pipelines are mature, prefer calling `doctor_treatment_table_maintenance` as the final
 # step of each individual pipeline load — that ties maintenance to the natural cadence of
 # each table's data changes, and avoids running across the whole Lakehouse every time.
 # ## Prerequisites
@@ -66,7 +66,7 @@ force_vacuum   = False     # Set True to trigger VACUUM regardless of day of wee
 # | Parameter | Type | Description |
 # |---|---|---|
 # | `lakehouse_guid` | string | The GUID of the Lakehouse to maintain. Found in the Lakehouse URL in the Fabric portal |
-# | `layer` | string | Medallion layer for all tables in this Lakehouse. Accepts `"bronze"`, `"silver"`, or `"gold"`. `"custom"` is not supported — all tables in a Lakehouse share the same layer. Default: `"silver"`. For Lakehouses where individual tables need different target sizes, call `dopt_utility_table_maintenance` directly with `layer = "custom"` |
+# | `layer` | string | Medallion layer for all tables in this Lakehouse. Accepts `"bronze"`, `"silver"`, or `"gold"`. `"custom"` is not supported — all tables in a Lakehouse share the same layer. Default: `"silver"`. For Lakehouses where individual tables need different target sizes, call `doctor_treatment_table_maintenance` directly with `layer = "custom"` |
 # | `force_vacuum` | boolean | When `True`, VACUUM runs on all tables regardless of day. Use after large backfills or initial loads. Default: `False` |
 
 

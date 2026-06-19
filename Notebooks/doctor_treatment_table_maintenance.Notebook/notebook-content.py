@@ -11,7 +11,7 @@
 
 # MARKDOWN ********************
 
-# # dopt_utility_table_maintenance
+# # doctor_treatment_table_maintenance
 # ## Purpose
 # Performs Delta table maintenance (OPTIMIZE and VACUUM) on a single table, passed as a
 # parameter from the calling pipeline.

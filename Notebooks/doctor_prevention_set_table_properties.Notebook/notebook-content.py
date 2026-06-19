@@ -11,7 +11,7 @@
 
 # MARKDOWN ********************
 
-# # dopt_utility_set_table_properties
+# # doctor_prevention_set_table_properties
 # ## Purpose
 # Sets Delta table properties on a single table based on its medallion layer. These
 # properties persist across Spark sessions and apply regardless of which notebook or
@@ -40,11 +40,11 @@
 # | `delta.targetFileSize` | 128 MB | 256 MB | 400 MB |
 # ### delta.targetFileSize and ATFS
 # `delta.targetFileSize` sets a per-table ceiling. Adaptive Target File Size (ATFS),
-# enabled in `dopt_utility_session_config`, adapts that target downward for small tables —
+# enabled in `doctor_prevention_session_config`, adapts that target downward for small tables —
 # preventing a 10 MB table from being compacted into a single 400 MB file. The two settings
 # work together: ATFS needs a ceiling to adapt from; this property provides it per table
 # rather than relying on a single workspace-wide default.
-# The logic mirrors `dopt_utility_session_config`:
+# The logic mirrors `doctor_prevention_session_config`:
 # - **Bronze**: `optimizeWrite` is disabled — append-only batch loads do not benefit from
 #   the shuffle that optimize write introduces. If your Bronze ingestion always uses MERGE,
 #   UPDATE, or DELETE, call this notebook with `layer = "custom"` and
@@ -63,10 +63,10 @@
 # Pass a comma-separated list of column names in `cluster_by` to enable liquid clustering
 # on the table (e.g. `"customer_id, order_date"`). Leave empty to skip.
 # Liquid clustering replaces partitioning — do not enable it on a table that already uses
-# traditional `PARTITION BY`. Check the `partitioned` column in `dopt_utility_table_health`
+# traditional `PARTITION BY`. Check the `partitioned` column in `doctor_diagnosis_table_health`
 # before enabling.
 # Enabling clustering does not physically cluster the data. The next OPTIMIZE run (via
-# `dopt_utility_table_maintenance` or the orchestrator) applies it.
+# `doctor_treatment_table_maintenance` or the orchestrator) applies it.
 # ## Warning — deletion vectors upgrade the table protocol
 # Enabling deletion vectors upgrades the Delta table reader/writer protocol. The table will
 # not be readable by clients that do not support deletion vectors. Verify client compatibility

@@ -1,6 +1,6 @@
-# Spark Session Config Utility
+﻿# Spark Session Config Utility
 
-Reference for the settings applied by `dopt_utility_session_config`. Covers what each setting does, the Fabric default, and when to override.
+Reference for the settings applied by `doctor_prevention_session_config`. Covers what each setting does, the Fabric default, and when to override.
 
 ## Current Config
 

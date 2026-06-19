@@ -1,4 +1,4 @@
-# Liquid Clustering
+﻿# Liquid Clustering
 
 > **Scope:** This guidance applies to Lakehouse (Spark/Delta) tables. Fabric Warehouse has its own clustering implementation, managed automatically behind the scenes — no action needed there. (Source: Miles Cole, Microsoft, Reddit r/MicrosoftFabric, 27 May 2026.)
 
@@ -41,7 +41,7 @@ Source: confirmed by Miles Cole (Principal PM, Microsoft), 2026-05-20. The Datab
 
 ## How to Enable Liquid Clustering
 
-**Using delta-optimizer:** Pass the `cluster_by` parameter to `dopt_utility_set_table_properties` as a comma-separated list of column names (e.g. `"customer_id, event_date"`). The notebook runs `ALTER TABLE ... CLUSTER BY (...)` and prints a reminder that clustering is applied physically on the next OPTIMIZE run. Leave `cluster_by` empty to skip — cluster key selection is a per-table decision and is not applied by `dopt_utility_set_properties_orchestrator`.
+**Using delta-doctor:** Pass the `cluster_by` parameter to `doctor_prevention_set_table_properties` as a comma-separated list of column names (e.g. `"customer_id, event_date"`). The notebook runs `ALTER TABLE ... CLUSTER BY (...)` and prints a reminder that clustering is applied physically on the next OPTIMIZE run. Leave `cluster_by` empty to skip — cluster key selection is a per-table decision and is not applied by `doctor_prevention_set_properties_orchestrator`.
 
 **Manually via SQL:** (`{table_path}` = `abfss://{workspace_guid}@onelake.dfs.fabric.microsoft.com/{lakehouse_guid}/Tables/{table_name}`)
 

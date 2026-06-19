@@ -1,6 +1,6 @@
-# Cold-Read Audit Prompt
+﻿# Cold-Read Audit Prompt
 
-A structured prompt for running a cross-file consistency audit of the delta-optimizer project using an AI agent. Run this at release boundaries or after large batches of changes — not continuously.
+A structured prompt for running a cross-file consistency audit of the delta-doctor project using an AI agent. Run this at release boundaries or after large batches of changes — not continuously.
 
 ## How to use
 
@@ -13,20 +13,20 @@ Update the **Known non-issues** section whenever you make a deliberate decision 
 ## Prompt
 
 ```
-You are doing a cold-read audit of the delta-optimizer project — a Fabric Notebook Library for Delta table maintenance on Microsoft Fabric. Your job is to read every file from scratch and find real issues: bugs, contradictions, broken invariants, documentation that disagrees with code. Do NOT flag cosmetic preferences or style opinions.
+You are doing a cold-read audit of the delta-doctor project — a Fabric Notebook Library for Delta table maintenance on Microsoft Fabric. Your job is to read every file from scratch and find real issues: bugs, contradictions, broken invariants, documentation that disagrees with code. Do NOT flag cosmetic preferences or style opinions.
 
 ## What to audit
 
 Read ALL of the following files in full:
 
 **Notebooks (notebook-content.py in each .Notebook folder):**
-- `Notebooks/dopt_utility_session_config.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_table_health.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_table_maintenance.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_maintenance_orchestrator.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_set_table_properties.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_set_properties_orchestrator.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_rebaseline_orchestrator.Notebook/notebook-content.py`
+- `Notebooks/doctor_prevention_session_config.Notebook/notebook-content.py`
+- `Notebooks/doctor_diagnosis_table_health.Notebook/notebook-content.py`
+- `Notebooks/doctor_treatment_table_maintenance.Notebook/notebook-content.py`
+- `Notebooks/doctor_treatment_maintenance_orchestrator.Notebook/notebook-content.py`
+- `Notebooks/doctor_prevention_set_table_properties.Notebook/notebook-content.py`
+- `Notebooks/doctor_prevention_set_properties_orchestrator.Notebook/notebook-content.py`
+- `Notebooks/doctor_treatment_rebaseline_orchestrator.Notebook/notebook-content.py`
 
 **Docs:**
 - `docs/optimize-vacuum.md`
@@ -48,7 +48,7 @@ Read ALL of the following files in full:
 - The inner `except Exception: pass` in `list_delta_tables()` schema subfolder recursion — intentional silence for non-Delta directories
 - The `mssparkutils.notebook.run()` timeout of 120 seconds in `set_properties_orchestrator` — documented in the notebook header
 - The `optimize-vacuum.md` code block omitting the single-file skip — documented inline as a simplified example
-- `optimizeWrite` table property always set to `true` for Silver/Gold — intentional; append-only pipelines disable at session level via `dopt_utility_session_config`
+- `optimizeWrite` table property always set to `true` for Silver/Gold — intentional; append-only pipelines disable at session level via `doctor_prevention_session_config`
 - The partition check in `set_table_properties` only fires when `cluster_by` is non-empty — correct; the section markdown accurately describes it as a guard for the clustering DDL path
 
 ## What to check
@@ -68,10 +68,10 @@ Read ALL of the following files in full:
 - `mssparkutils.env.getWorkspaceId()` used everywhere the workspace GUID is needed?
 
 **Parameter correctness:**
-- Does `dopt_utility_table_maintenance` raise `ValueError` when `layer = "custom"` and `custom_target_mb` is 0?
-- Does `dopt_utility_session_config` validate `custom_optimize_write` and `custom_v_order` as strings when `layer = "custom"`?
-- Does `dopt_utility_set_table_properties` check partition columns before any DDL when `cluster_by` is set?
-- Does `dopt_utility_table_health` warn when `custom_target_mb > 0` with a non-custom layer?
+- Does `doctor_treatment_table_maintenance` raise `ValueError` when `layer = "custom"` and `custom_target_mb` is 0?
+- Does `doctor_prevention_session_config` validate `custom_optimize_write` and `custom_v_order` as strings when `layer = "custom"`?
+- Does `doctor_prevention_set_table_properties` check partition columns before any DDL when `cluster_by` is set?
+- Does `doctor_diagnosis_table_health` warn when `custom_target_mb > 0` with a non-custom layer?
 
 **Documentation accuracy:**
 - Does the validation guide expected output for tests 1.1–1.4 match all print statements the notebook actually emits?

@@ -1,6 +1,6 @@
-# delta-optimizer
+﻿# delta-doctor
 
-[![Version](https://img.shields.io/badge/version-v0.1-blue)](https://github.com/bradcoles-dev/delta-optimizer/releases)
+[![Version](https://img.shields.io/badge/version-v0.1-blue)](https://github.com/bradcoles-dev/delta-doctor/releases)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](LICENSE)
 
 **Production-ready Delta table maintenance for Microsoft Fabric.**
@@ -13,7 +13,7 @@ This affects any Fabric Lakehouse, regardless of how data gets in. Whether you w
 
 ## What it is
 
-**delta-optimizer** is a Fabric Notebook Library — a collection of Spark notebooks you import directly into your Fabric workspace via the **Import notebook** button in the Data Engineering experience. There is no installation command or package manager. Each notebook has a single, well-defined responsibility and is designed to be called from a Fabric Data Factory pipeline or run interactively.
+**delta-doctor** is a Fabric Notebook Library — a collection of Spark notebooks you import directly into your Fabric workspace via the **Import notebook** button in the Data Engineering experience. There is no installation command or package manager. Each notebook has a single, well-defined responsibility and is designed to be called from a Fabric Data Factory pipeline or run interactively.
 
 Delta table maintenance sits below the transformation layer — it applies to the tables themselves, not to whatever wrote them. If you use dbt-fabric, Dataflow Gen2, or Copy activity for your transformations, this library is still fully applicable. The one exception is Fabric Warehouse, which manages its own storage automatically.
 
@@ -30,15 +30,32 @@ The library is:
 
 ## The Library
 
+delta-doctor is organised around three pillars: **Diagnosis**, **Treatment**, and **Preventative Care**.
+
+### Diagnosis
+*Understand what your tables look like before you change anything.*
+
 | Notebook | Purpose | Typical caller |
 |---|---|---|
-| `dopt_utility_session_config` | Sets up a Spark session with the correct baseline configurations for a given medallion layer | Called at the top of every pipeline notebook |
-| `dopt_utility_table_health` | Scans all tables in a Lakehouse and produces a health report — file counts, average file sizes, fragmentation status, deletion vector state, clustering state. Pass `lakehouse_guid` as a parameter | Run interactively or as a pipeline step |
-| `dopt_utility_table_maintenance` | Runs OPTIMIZE (if needed) and VACUUM (weekly or forced) on a single table. Logs before/after file counts and average file size when OPTIMIZE runs | Called as the final step of each pipeline load |
-| `dopt_utility_maintenance_orchestrator` | Iterates all tables in a Lakehouse, running OPTIMIZE and VACUUM on each. Logs before/after metrics per table and prints a run summary including total files compacted | Scheduled pipeline; useful before adopting per-table pipeline calls |
-| `dopt_utility_set_table_properties` | Sets Delta table properties (deletion vectors, auto-compaction, optimize write, V-Order, target file size) on a single table by layer. Supports a custom mode for non-medallion tables. Optionally enables liquid clustering | Run once per table at setup time, or called from an onboarding pipeline |
-| `dopt_utility_set_properties_orchestrator` | Iterates all tables in a Lakehouse and calls `dopt_utility_set_table_properties` for each. Run once per Lakehouse at onboarding time, passing the matching `layer` for that Lakehouse. Does not apply liquid clustering — cluster keys are per-table and must be set via `dopt_utility_set_table_properties` directly | One-off onboarding pipeline; run once per medallion Lakehouse |
-| `dopt_utility_rebaseline_orchestrator` | Runs `REORG TABLE APPLY (PURGE)` followed by OPTIMIZE on every table in a Lakehouse, rewriting all files to the correct layer target and purging accumulated deletion vectors. Run once on a previously unmaintained Lakehouse before switching to the maintenance orchestrator for ongoing maintenance | One-off rebaseline; run after `dopt_utility_set_properties_orchestrator`, before ongoing maintenance |
+| `doctor_diagnosis_table_health` | Scans all tables in a Lakehouse and produces a health report — file counts, average file sizes, fragmentation status, deletion vector state, clustering state. Classifies each table as Healthy, Review, Needs OPTIMIZE, Oversized, or a skip status | Run interactively before onboarding, or any time you want a current picture |
+
+### Treatment
+*Fix what is broken and restore tables to a healthy baseline.*
+
+| Notebook | Purpose | Typical caller |
+|---|---|---|
+| `doctor_treatment_table_maintenance` | Runs OPTIMIZE (if needed) and VACUUM (weekly or forced) on a single table. Logs before/after file counts and average file size when OPTIMIZE runs | Called as the final step of each pipeline load |
+| `doctor_treatment_maintenance_orchestrator` | Iterates all tables in a Lakehouse, running OPTIMIZE and VACUUM on each. Logs before/after metrics per table and prints a run summary including total files compacted | Scheduled pipeline; useful before adopting per-table pipeline calls |
+| `doctor_treatment_rebaseline_orchestrator` | Runs `REORG TABLE APPLY (PURGE)` followed by OPTIMIZE on every table in a Lakehouse, rewriting all files to the correct layer target and purging accumulated deletion vectors | One-off rebaseline on a neglected Lakehouse; run once, then hand off to the maintenance orchestrator |
+
+### Preventative Care
+*Configure tables and sessions correctly so problems do not reoccur.*
+
+| Notebook | Purpose | Typical caller |
+|---|---|---|
+| `doctor_prevention_session_config` | Sets up a Spark session with the correct baseline configurations for a given medallion layer | Called at the top of every pipeline notebook |
+| `doctor_prevention_set_table_properties` | Sets Delta table properties (deletion vectors, auto-compaction, optimize write, V-Order, target file size) on a single table by layer. Supports a custom mode for non-medallion tables. Optionally enables liquid clustering | Run once per table at setup time, or called from an onboarding pipeline |
+| `doctor_prevention_set_properties_orchestrator` | Iterates all tables in a Lakehouse and calls `doctor_prevention_set_table_properties` for each. Run once per Lakehouse at onboarding time | One-off onboarding pipeline; run once per medallion Lakehouse |
 
 > **Schema support:** All notebooks use ABFSS paths and handle both schema-enabled Lakehouses (`Tables/{schema}/{table}`) and non-schema Lakehouses (`Tables/{table}`) automatically.
 
@@ -54,7 +71,7 @@ Every OPTIMIZE call is gated on a metadata check (`DESCRIBE DETAIL`) — no data
 **Layer targets are explicit, not implicit.**
 Bronze targets 128 MB. Silver targets 256 MB. Gold targets 400 MB. These are passed as parameters, not buried in defaults.
 
-The `target_mb` parameter in the maintenance notebooks is the *threshold for whether to call OPTIMIZE* — not the output file size. Adaptive Target File Size (ATFS) controls the actual output size when OPTIMIZE runs. `dopt_utility_set_table_properties` sets `delta.targetFileSize` as a table property to give ATFS a per-table ceiling to adapt from, while ATFS adapts downward for small tables to avoid pathological results.
+The `target_mb` parameter in the maintenance notebooks is the *threshold for whether to call OPTIMIZE* — not the output file size. Adaptive Target File Size (ATFS) controls the actual output size when OPTIMIZE runs. `doctor_prevention_set_table_properties` sets `delta.targetFileSize` as a table property to give ATFS a per-table ceiling to adapt from, while ATFS adapts downward for small tables to avoid pathological results.
 
 The targets that matter most for correctness are **Silver and Gold**. Silver at 256 MB balances Spark processing efficiency for transformation workloads. Gold at 400 MB is critical — the SQL Analytics Endpoint and Power BI Direct Lake have genuine performance dependencies on file size. Bronze at 128 MB is a pragmatic default, not a hard requirement: Bronze tables are read by Spark notebooks, not by Direct Lake or the SQL Endpoint, and the difference between 80 MB and 128 MB files at Bronze has no meaningful query performance impact. The priority at Bronze is preventing small file accumulation, not hitting an exact size.
 
@@ -80,14 +97,14 @@ Session configs apply only to the current notebook session. For tables written b
 
 1. Download or clone this repository
 2. Import the notebooks into your Fabric workspace via **Import notebook** in the Data Engineering experience
-3. Start with `dopt_utility_table_health` — pass `lakehouse_guid` as a parameter and run it to see the current state of your tables before changing anything
-4. Run `dopt_utility_set_properties_orchestrator` once per Lakehouse to set the correct Delta table properties for every table. Pass the `lakehouse_guid` and the `layer` for that Lakehouse
-5. Run `dopt_utility_maintenance_orchestrator` to compact small files and reclaim storage across all tables. On a previously unmaintained Lakehouse the first run will take longer than subsequent runs — expect at least minutes per table depending on size and fragmentation. Monitor progress in the Spark UI. Subsequent runs cost almost nothing when tables are already healthy
+3. Start with `doctor_diagnosis_table_health` — pass `lakehouse_guid` as a parameter and run it to see the current state of your tables before changing anything
+4. Run `doctor_prevention_set_properties_orchestrator` once per Lakehouse to set the correct Delta table properties for every table. Pass the `lakehouse_guid` and the `layer` for that Lakehouse
+5. Run `doctor_treatment_maintenance_orchestrator` to compact small files and reclaim storage across all tables. On a previously unmaintained Lakehouse the first run will take longer than subsequent runs — expect at least minutes per table depending on size and fragmentation. Monitor progress in the Spark UI. Subsequent runs cost almost nothing when tables are already healthy
 
 > Steps 3–5 are one-time setup. Steps 6–7 are the ongoing pattern — wired into every pipeline going forward.
 
-6. Add a call to `dopt_utility_session_config` at the top of each pipeline notebook, passing the layer as a parameter
-7. Wire `dopt_utility_table_maintenance` as the final activity in each pipeline going forward. Required parameters: `lakehouse_guid`, `table_name`, `layer`. Optional: `schema_name` (schema-enabled Lakehouses only), `force_vacuum` (default `False`; set `True` for ad-hoc runs after large backfills). When `layer = "custom"`, `custom_target_mb` is also required — must be a positive integer specifying the target file size in MB
+6. Add a call to `doctor_prevention_session_config` at the top of each pipeline notebook, passing the layer as a parameter
+7. Wire `doctor_treatment_table_maintenance` as the final activity in each pipeline going forward. Required parameters: `lakehouse_guid`, `table_name`, `layer`. Optional: `schema_name` (schema-enabled Lakehouses only), `force_vacuum` (default `False`; set `True` for ad-hoc runs after large backfills). When `layer = "custom"`, `custom_target_mb` is also required — must be a positive integer specifying the target file size in MB
 
 > **Pipeline return values:** These notebooks print all decisions to Spark stdout (visible in pipeline run logs) but do not return structured values via `mssparkutils.notebook.exit()`. Pipeline branching on individual maintenance outcomes is not currently supported.
 
@@ -101,13 +118,13 @@ Detailed setup guides are in [`/docs`](./docs/).
 Seven notebooks covering session config, table health scanning, single-table maintenance, Lakehouse-wide maintenance orchestration, table property management, Lakehouse-wide property orchestration, and one-off Lakehouse rebaselining. Deployable directly into any Fabric workspace.
 
 ### v0.2 — Observability
-**Health history logging.** `dopt_utility_table_health` gains an optional `history_lakehouse_guid` parameter. When provided, it appends the full Lakehouse snapshot to a `dopt_table_health_history` Delta table at the end of each run — one write, one clean timestamped snapshot per execution. When empty, the notebook behaves exactly as it does today (interactive display only), preserving the existing use case.
+**Health history logging.** `doctor_diagnosis_table_health` gains an optional `history_lakehouse_guid` parameter. When provided, it appends the full Lakehouse snapshot to a `doctor_table_health_history` Delta table at the end of each run — one write, one clean timestamped snapshot per execution. When empty, the notebook behaves exactly as it does today (interactive display only), preserving the existing use case.
 
 The history table schema is the existing health report columns plus `run_timestamp`. Scheduled daily, this produces a per-table trend record over time: file count, average file size, fragmentation status, deletion vector state, clustering state.
 
-**Power BI dashboard.** A Direct Lake semantic model built on `dopt_table_health_history` enables a Delta table health monitoring dashboard — trend lines per table, status breakdowns, tables that are degrading between runs. No additional infrastructure beyond the existing Lakehouse.
+**Power BI dashboard.** A Direct Lake semantic model built on `doctor_table_health_history` enables a Delta table health monitoring dashboard — trend lines per table, status breakdowns, tables that are degrading between runs. No additional infrastructure beyond the existing Lakehouse.
 
-**Control table.** A Delta table mapping `table_name → layer` to allow `dopt_utility_set_properties_orchestrator` to apply per-table layer overrides (e.g. a Silver table configured with Gold properties for Direct Lake), removing the current assumption that all tables in a Lakehouse share the same layer.
+**Control table.** A Delta table mapping `table_name → layer` to allow `doctor_prevention_set_properties_orchestrator` to apply per-table layer overrides (e.g. a Silver table configured with Gold properties for Direct Lake), removing the current assumption that all tables in a Lakehouse share the same layer.
 
 **File size distribution.** The v0.1 maintenance notebooks use average file size as a proxy for compaction decisions. A bimodal distribution of small and large files (e.g. three 200 MB files and one 1 GB file on a 400 MB Gold target) may not be detected correctly by the average alone. Health history data enables per-file size distribution analysis — improving REORG gating accuracy — planned for v0.2.
 
@@ -131,9 +148,9 @@ The package exposes a clean programmatic API — `diagnose(lakehouse_guid)`, `op
 A user-facing interface that wraps the Python package API. The practitioner enters a Lakehouse GUID, selects a layer, and clicks **Diagnose**. The tool returns the health report — file counts, fragmentation status, deletion vector state, clustering state — and surfaces specific recommendations: which tables need OPTIMIZE, which need properties set, which are healthy. The practitioner reviews and clicks **Apply**. No notebook authoring required.
 
 The most natural Fabric-native surface is a Power App or Fabric workload extension. The diagnosis → recommendation → apply loop maps directly onto the existing library:
-- Diagnose → `dopt_utility_table_health`
+- Diagnose → `doctor_diagnosis_table_health`
 - Recommend → status column logic (`Needs OPTIMIZE`, `Review`, `Healthy`)
-- Apply → `dopt_utility_maintenance_orchestrator` + `dopt_utility_set_properties_orchestrator`
+- Apply → `doctor_treatment_maintenance_orchestrator` + `doctor_prevention_set_properties_orchestrator`
 
 ### Beyond v2.0 — Fabric-Native App (Rayfin)
 Rather than a traditionally-hosted external service, the productised offering is a Fabric-native app built on [Rayfin](https://www.microsoft.com/en-us/microsoft-fabric/features/rayfin) — Microsoft's open-source SDK for code-first backends on Fabric (announced Build 2026).
@@ -141,9 +158,9 @@ Rather than a traditionally-hosted external service, the productised offering is
 A Rayfin app removes the trust and infrastructure problems of an external hosted service:
 - The app deploys as a first-class artifact inside the user's own Fabric workspace — no OAuth, no external data transfer, governance inherited automatically
 - Health scan results land directly in OneLake, making the history table immediately available to Power BI Direct Lake with no additional pipeline work
-- The app itself can be open-sourced on top of the delta-optimizer Python package
+- The app itself can be open-sourced on top of the delta-doctor Python package
 
-The architecture is a clean layer split: the Rayfin app handles the UI, API, and orchestration layer in Python; the delta-optimizer Python package (v1.0) handles the Spark operations underneath. Delta DDL commands (`OPTIMIZE`, `VACUUM`, `ALTER TABLE`) require Spark and always will — the Python package wraps these and is called by the Rayfin layer via the Fabric REST API or directly within a Spark context.
+The architecture is a clean layer split: the Rayfin app handles the UI, API, and orchestration layer in Python; the delta-doctor Python package (v1.0) handles the Spark operations underneath. Delta DDL commands (`OPTIMIZE`, `VACUUM`, `ALTER TABLE`) require Spark and always will — the Python package wraps these and is called by the Rayfin layer via the Fabric REST API or directly within a Spark context.
 
 ---
 

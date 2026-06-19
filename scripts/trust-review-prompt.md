@@ -1,6 +1,6 @@
-# Trust Review Prompt
+﻿# Trust Review Prompt
 
-A structured prompt for evaluating delta-optimizer's production readiness and trustworthiness from the perspective of an engineer deciding whether to adopt an open-source library in a production environment. Run this before any public release or major version bump.
+A structured prompt for evaluating delta-doctor's production readiness and trustworthiness from the perspective of an engineer deciding whether to adopt an open-source library in a production environment. Run this before any public release or major version bump.
 
 ## How to use
 
@@ -13,7 +13,7 @@ The goal is to surface gaps in transparency, missing warnings, overstated claims
 ## Prompt
 
 ```
-You are a cautious senior engineer at an organisation evaluating open-source tooling for production use. You have been asked to assess delta-optimizer — a Fabric Notebook Library for Delta table maintenance — for production adoption. Your organisation runs Microsoft Fabric with Gold-layer tables serving Power BI Direct Lake for business-critical reporting.
+You are a cautious senior engineer at an organisation evaluating open-source tooling for production use. You have been asked to assess delta-doctor — a Fabric Notebook Library for Delta table maintenance — for production adoption. Your organisation runs Microsoft Fabric with Gold-layer tables serving Power BI Direct Lake for business-critical reporting.
 
 Your job is to evaluate whether this library is trustworthy, transparent about its limitations, and safe to adopt in production. You are NOT evaluating whether it is technically complete — you are evaluating whether it is honest and responsible about what it does, what it does not do, and what could go wrong.
 
@@ -26,11 +26,11 @@ Your job is to evaluate whether this library is trustworthy, transparent about i
 5. `docs/optimize-vacuum.md`
 6. `docs/deletion-vectors.md`
 7. `docs/liquid-clustering.md`
-8. `Notebooks/dopt_utility_table_maintenance.Notebook/notebook-content.py`
-9. `Notebooks/dopt_utility_maintenance_orchestrator.Notebook/notebook-content.py`
-10. `Notebooks/dopt_utility_set_table_properties.Notebook/notebook-content.py`
-11. `Notebooks/dopt_utility_rebaseline_orchestrator.Notebook/notebook-content.py`
-12. `Notebooks/dopt_utility_table_health.Notebook/notebook-content.py`
+8. `Notebooks/doctor_treatment_table_maintenance.Notebook/notebook-content.py`
+9. `Notebooks/doctor_treatment_maintenance_orchestrator.Notebook/notebook-content.py`
+10. `Notebooks/doctor_prevention_set_table_properties.Notebook/notebook-content.py`
+11. `Notebooks/doctor_treatment_rebaseline_orchestrator.Notebook/notebook-content.py`
+12. `Notebooks/doctor_diagnosis_table_health.Notebook/notebook-content.py`
 
 ## What to assess
 
@@ -50,8 +50,8 @@ Your job is to evaluate whether this library is trustworthy, transparent about i
 
 **Idempotency and safety**
 - Is it safe to run the maintenance orchestrator multiple times against the same Lakehouse? Would repeated runs cause unintended changes?
-- Is it safe to run `dopt_utility_set_table_properties` multiple times against the same table?
-- Is it safe to run `dopt_utility_rebaseline_orchestrator` more than once? Is the "run once" constraint clear enough?
+- Is it safe to run `doctor_prevention_set_table_properties` multiple times against the same table?
+- Is it safe to run `doctor_treatment_rebaseline_orchestrator` more than once? Is the "run once" constraint clear enough?
 - Are there any operations that could leave a table in a partially-modified state if they fail mid-run?
 
 **Observability and debuggability**

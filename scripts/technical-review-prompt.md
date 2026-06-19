@@ -1,6 +1,6 @@
-# Technical Review Prompt
+﻿# Technical Review Prompt
 
-A structured prompt for stress-testing the technical correctness of delta-optimizer from the perspective of a senior Delta Lake / Microsoft Fabric engineer. Run this before any public release or after significant changes to maintenance logic, session config, or table property decisions.
+A structured prompt for stress-testing the technical correctness of delta-doctor from the perspective of a senior Delta Lake / Microsoft Fabric engineer. Run this before any public release or after significant changes to maintenance logic, session config, or table property decisions.
 
 ## How to use
 
@@ -13,20 +13,20 @@ The goal is to surface unsound design decisions, incorrect technical claims, and
 ## Prompt
 
 ```
-You are a principal engineer with deep expertise in Delta Lake internals, Apache Spark, and Microsoft Fabric. You have built and operated large-scale Delta table maintenance systems in production. You are doing a technical review of delta-optimizer — a Fabric Notebook Library for Delta table maintenance.
+You are a principal engineer with deep expertise in Delta Lake internals, Apache Spark, and Microsoft Fabric. You have built and operated large-scale Delta table maintenance systems in production. You are doing a technical review of delta-doctor — a Fabric Notebook Library for Delta table maintenance.
 
 Your job is to evaluate whether the technical decisions, Spark configurations, SQL operations, and maintenance logic are correct and well-reasoned. Flag anything that is wrong, incomplete, or likely to cause problems in production. Do NOT flag cosmetic or style issues.
 
 ## What to read
 
 **All notebooks:**
-- `Notebooks/dopt_utility_session_config.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_table_health.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_table_maintenance.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_maintenance_orchestrator.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_set_table_properties.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_set_properties_orchestrator.Notebook/notebook-content.py`
-- `Notebooks/dopt_utility_rebaseline_orchestrator.Notebook/notebook-content.py`
+- `Notebooks/doctor_prevention_session_config.Notebook/notebook-content.py`
+- `Notebooks/doctor_diagnosis_table_health.Notebook/notebook-content.py`
+- `Notebooks/doctor_treatment_table_maintenance.Notebook/notebook-content.py`
+- `Notebooks/doctor_treatment_maintenance_orchestrator.Notebook/notebook-content.py`
+- `Notebooks/doctor_prevention_set_table_properties.Notebook/notebook-content.py`
+- `Notebooks/doctor_prevention_set_properties_orchestrator.Notebook/notebook-content.py`
+- `Notebooks/doctor_treatment_rebaseline_orchestrator.Notebook/notebook-content.py`
 
 **Docs:**
 - `docs/optimize-vacuum.md`
@@ -43,7 +43,7 @@ Your job is to evaluate whether the technical decisions, Spark configurations, S
 ## What to assess
 
 **Session configuration**
-- Are the Spark session configs in `dopt_utility_session_config` correct for Fabric Runtime 1.3+?
+- Are the Spark session configs in `doctor_prevention_session_config` correct for Fabric Runtime 1.3+?
 - Is the baseline + override pattern sound? Are there any configs that should not be set at session level?
 - Is `spark.sql.caseSensitive = true` appropriate as a global baseline, or could it cause issues?
 - Is the interaction between `optimizeWrite` (session config) and `delta.autoOptimize.optimizeWrite` (table property) correctly understood and documented?
@@ -66,7 +66,7 @@ Your job is to evaluate whether the technical decisions, Spark configurations, S
 - Is the Direct Lake re-framing requirement correctly described and placed?
 
 **Delta table properties**
-- Are the properties set by `dopt_utility_set_table_properties` correct for each layer?
+- Are the properties set by `doctor_prevention_set_table_properties` correct for each layer?
 - Is `delta.targetFileSize` set in bytes correctly (128 * 1024 * 1024, etc.)?
 - Is the interaction between `delta.targetFileSize` and ATFS (`spark.microsoft.delta.targetFileSize.adaptive.enabled`) correctly described?
 - Is `delta.enableDeletionVectors = true` safe to apply unconditionally across all layers?

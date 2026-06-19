@@ -1,6 +1,6 @@
-# Deployment Validation Guide
+﻿# Deployment Validation Guide
 
-A structured set of acceptance tests to validate that delta-optimizer is working correctly in your Fabric workspace before using it in production. Run through each section in order — each notebook is tested in isolation before the orchestrators are validated.
+A structured set of acceptance tests to validate that delta-doctor is working correctly in your Fabric workspace before using it in production. Run through each section in order — each notebook is tested in isolation before the orchestrators are validated.
 
 ## Prerequisites
 
@@ -18,16 +18,16 @@ If you need test tables, run the following in a Fabric notebook attached to your
 ```python
 # Creates two tables with fragmentation for realistic test results
 for i in range(5):
-    spark.range(10000).write.format("delta").mode("append").saveAsTable("dopt_test_table_a")
+    spark.range(10000).write.format("delta").mode("append").saveAsTable("doctor_test_table_a")
 for i in range(3):
-    spark.range(5000).write.format("delta").mode("append").saveAsTable("dopt_test_table_b")
+    spark.range(5000).write.format("delta").mode("append").saveAsTable("doctor_test_table_b")
 ```
 
 **Optional:** A schema-enabled Lakehouse for [Section 7](#7-schema-enabled-lakehouse-validation-optional).
 
 ---
 
-## 1. dopt_utility_session_config
+## 1. doctor_prevention_session_config
 
 Validates layer-driven Spark session configuration.
 
@@ -98,7 +98,7 @@ Session configuration complete for layer: custom
 
 ---
 
-## 2. dopt_utility_table_health
+## 2. doctor_diagnosis_table_health
 
 Validates table enumeration, health metrics, and status classification. This is read-only — safe to run at any time.
 
@@ -145,7 +145,7 @@ Re-run with `layer = "bronze"` then `layer = "gold"`. Verify that `status` value
 
 ---
 
-## 3. dopt_utility_set_table_properties
+## 3. doctor_prevention_set_table_properties
 
 Validates that Delta table properties are applied correctly per layer.
 
@@ -165,7 +165,7 @@ delta.parquet.vorder.enabled = false
 delta.targetFileSize = 268435456
 ```
 
-**Verify:** Re-run `dopt_utility_table_health` — the table should now show `deletion_vectors = true`.
+**Verify:** Re-run `doctor_diagnosis_table_health` — the table should now show `deletion_vectors = true`.
 
 ### 3.2 — Gold layer
 | Parameter | Value |
@@ -190,7 +190,7 @@ delta.targetFileSize = 268435456
   Note: clustering is applied physically on the next OPTIMIZE run.
 ```
 
-**Verify:** Re-run `dopt_utility_table_health` — the table should show `liquid_clustering = true`.
+**Verify:** Re-run `doctor_diagnosis_table_health` — the table should show `liquid_clustering = true`.
 
 ### 3.4 — Custom mode (selective)
 | Parameter | Value |
@@ -211,7 +211,7 @@ Run with empty `lakehouse_guid` or empty `table_name`. **Expected:** `ValueError
 
 ---
 
-## 4. dopt_utility_set_properties_orchestrator
+## 4. doctor_prevention_set_properties_orchestrator
 
 Validates that all tables in a Lakehouse receive the correct properties in a single run.
 
@@ -224,9 +224,9 @@ Validates that all tables in a Lakehouse receive the correct properties in a sin
 **Expected:**
 - One line per table: `{table}: properties set`
 - Summary: `updated: N | errors: 0`
-- N matches the table count from `dopt_utility_table_health`
+- N matches the table count from `doctor_diagnosis_table_health`
 
-**Verify:** Re-run `dopt_utility_table_health` — all tables should show `deletion_vectors = true`.
+**Verify:** Re-run `doctor_diagnosis_table_health` — all tables should show `deletion_vectors = true`.
 
 ### 4.2 — Error resilience
 If any table in the Lakehouse cannot accept properties (permissions, external table, etc.):
@@ -236,12 +236,12 @@ If any table in the Lakehouse cannot accept properties (permissions, external ta
 
 ---
 
-## 5. dopt_utility_table_maintenance
+## 5. doctor_treatment_table_maintenance
 
 Validates OPTIMIZE gating, before/after metrics, and VACUUM scheduling.
 
 ### 5.1 — Fragmented table (OPTIMIZE expected)
-Select a table showing `Needs OPTIMIZE` in the `dopt_utility_table_health` output.
+Select a table showing `Needs OPTIMIZE` in the `doctor_diagnosis_table_health` output.
 
 | Parameter | Value |
 |---|---|
@@ -300,7 +300,7 @@ Select a table showing `Healthy` in the health report.
 
 ---
 
-## 6. dopt_utility_maintenance_orchestrator
+## 6. doctor_treatment_maintenance_orchestrator
 
 Validates Lakehouse-wide maintenance, summary accuracy, and error resilience.
 
@@ -312,12 +312,12 @@ Validates Lakehouse-wide maintenance, summary accuracy, and error resilience.
 | `force_vacuum` | `False` |
 
 **Expected:**
-- `Tables found: N` matches the count from `dopt_utility_table_health`
+- `Tables found: N` matches the count from `doctor_diagnosis_table_health`
 - Each table logs `skipped` or `OPTIMIZE ran` with file counts
 - Summary: `optimized: X | skipped: Y | vacuumed: 0 | errors: 0 | files compacted: Z` (if not run on a Sunday — on Sunday VACUUM fires automatically and `vacuumed` will equal N)
 - X + Y = N
 
-**Cross-check:** Re-run `dopt_utility_table_health` — previously fragmented tables should now show `Healthy` or `Review`.
+**Cross-check:** Re-run `doctor_diagnosis_table_health` — previously fragmented tables should now show `Healthy` or `Review`.
 
 ### 6.2 — Forced VACUUM pass
 | Parameter | Value |
@@ -330,7 +330,7 @@ Validates Lakehouse-wide maintenance, summary accuracy, and error resilience.
 
 ---
 
-## 7. dopt_utility_rebaseline_orchestrator *(one-off only)*
+## 7. doctor_treatment_rebaseline_orchestrator *(one-off only)*
 
 Validates the one-off Lakehouse rebaseline. Only run this once — it performs a full table rewrite on every table and is not intended for recurring use.
 
@@ -341,13 +341,13 @@ Validates the one-off Lakehouse rebaseline. Only run this once — it performs a
 | `layer` | `silver` |
 
 **Expected:**
-- `Tables found: N` matches the count from `dopt_utility_table_health`
+- `Tables found: N` matches the count from `doctor_diagnosis_table_health`
 - Each non-empty table logs: `{table}: rebaselined — files A → B (C compacted) | avg XMB → YMB`
 - Empty tables log: `{table}: skipped — no files`
 - Summary: `rebaselined: N | skipped: 0 | errors: 0 | files compacted: Z`
 - Average file sizes after rebaseline should be near the layer target (256 MB for silver)
 
-**Verify:** Re-run `dopt_utility_table_health` — all non-empty tables should show `Healthy` or `Review`.
+**Verify:** Re-run `doctor_diagnosis_table_health` — all non-empty tables should show `Healthy` or `Review`.
 
 ### 7.2 — Error resilience
 If any table fails (permissions, external table, etc.), the run continues. The summary error count reflects the failure and all other tables complete normally.
@@ -356,7 +356,7 @@ If any table fails (permissions, external table, etc.), the run continues. The s
 
 ## 8. Schema-Enabled Lakehouse Validation *(Optional)*
 
-Validates the `list_delta_tables()` schema detection logic used by `dopt_utility_table_health`, `dopt_utility_maintenance_orchestrator`, `dopt_utility_set_properties_orchestrator`, and `dopt_utility_rebaseline_orchestrator`. Only required if your environment uses schema-enabled Lakehouses.
+Validates the `list_delta_tables()` schema detection logic used by `doctor_diagnosis_table_health`, `doctor_treatment_maintenance_orchestrator`, `doctor_prevention_set_properties_orchestrator`, and `doctor_treatment_rebaseline_orchestrator`. Only required if your environment uses schema-enabled Lakehouses.
 
 ### 8.1 — Health scan across schemas
 | Parameter | Value |
@@ -370,7 +370,7 @@ Validates the `list_delta_tables()` schema detection logic used by `dopt_utility
 - No tables are missed or duplicated across schema boundaries
 
 ### 8.2 — Orchestrator across schemas
-Run `dopt_utility_maintenance_orchestrator` with the schema-enabled Lakehouse GUID.
+Run `doctor_treatment_maintenance_orchestrator` with the schema-enabled Lakehouse GUID.
 
 **Expected:**
 - All tables across all schemas are processed

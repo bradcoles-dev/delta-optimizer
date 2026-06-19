@@ -11,12 +11,12 @@
 
 # MARKDOWN ********************
 
-# # dopt_utility_session_config
+# # doctor_prevention_session_config
 # ## Purpose
 # Sets the Spark session configuration baseline for a given medallion layer.
 # Call this notebook at the top of every pipeline notebook using
-# `mssparkutils.notebook.run("dopt_utility_session_config")` or
-# `%run dopt_utility_session_config`. It establishes a consistent, known configuration
+# `mssparkutils.notebook.run("doctor_prevention_session_config")` or
+# `%run doctor_prevention_session_config`. It establishes a consistent, known configuration
 # regardless of workspace defaults - which vary by workspace age and history.
 # ## What it does
 # - Applies the full session baseline (Auto-Compaction, ATFS, Fast Optimize, File Level

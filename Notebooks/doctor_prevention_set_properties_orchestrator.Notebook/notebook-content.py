@@ -11,24 +11,24 @@
 
 # MARKDOWN ********************
 
-# # dopt_utility_set_properties_orchestrator
+# # doctor_prevention_set_properties_orchestrator
 # ## Purpose
-# Iterates all tables in a Lakehouse and calls `dopt_utility_set_table_properties` for
+# Iterates all tables in a Lakehouse and calls `doctor_prevention_set_table_properties` for
 # each, applying the correct Delta table properties for the given medallion layer. Run
-# this once when onboarding a Lakehouse to delta-optimizer, or after adding a batch of
+# this once when onboarding a Lakehouse to delta-doctor, or after adding a batch of
 # new tables.
 # ## What it does
 # - Enumerates all tables via the OneLake ABFSS path — handles both schema-enabled and
 #   non-schema Lakehouses automatically
-# - Calls `dopt_utility_set_table_properties` for each table, passing the Lakehouse GUID,
+# - Calls `doctor_prevention_set_table_properties` for each table, passing the Lakehouse GUID,
 #   table name, schema name, and layer
 # - Catches and logs errors per table — one failing table does not stop the run
 # - Prints a summary of tables updated and errored
 # - Does not apply liquid clustering — cluster key selection is per-table and must be
-#   set via `dopt_utility_set_table_properties` directly
-# ## When to use this vs dopt_utility_set_table_properties
+#   set via `doctor_prevention_set_table_properties` directly
+# ## When to use this vs doctor_prevention_set_table_properties
 # Use this orchestrator to initialise an entire Lakehouse in one pipeline step. Once
-# tables are configured, prefer calling `dopt_utility_set_table_properties` individually
+# tables are configured, prefer calling `doctor_prevention_set_table_properties` individually
 # when adding new tables — there is no need to re-run the full Lakehouse on every change.
 # ## One Lakehouse per layer
 # This notebook assumes one Lakehouse per medallion layer, which is the standard Fabric
@@ -38,7 +38,7 @@
 # - Gold Lakehouse   → `layer = "gold"`
 # ## Note on the workspace
 # `mssparkutils.notebook.run()` identifies the target notebook by name within the same
-# Fabric workspace. Ensure `dopt_utility_set_table_properties` has been imported into
+# Fabric workspace. Ensure `doctor_prevention_set_table_properties` has been imported into
 # the same workspace as this orchestrator before running. Both notebooks must be in the
 # same workspace as the target Lakehouse.
 # ## Timeout
@@ -54,7 +54,7 @@
 # Default values below are used when running the notebook interactively.
 
 lakehouse_guid = ""        # The GUID of the Lakehouse to configure
-layer          = "silver"  # Medallion layer: "bronze", "silver", or "gold". "custom" is not supported — use dopt_utility_set_table_properties directly for tables requiring non-standard configuration
+layer          = "silver"  # Medallion layer: "bronze", "silver", or "gold". "custom" is not supported — use doctor_prevention_set_table_properties directly for tables requiring non-standard configuration
 
 # METADATA ********************
 
@@ -69,7 +69,7 @@ layer          = "silver"  # Medallion layer: "bronze", "silver", or "gold". "cu
 # | Parameter | Type | Description |
 # |---|---|---|
 # | `lakehouse_guid` | string | The GUID of the Lakehouse to configure. Found in the Lakehouse URL in the Fabric portal |
-# | `layer` | string | The medallion layer for all tables in this Lakehouse. Accepts `"bronze"`, `"silver"`, or `"gold"`. `"custom"` is not supported — use `dopt_utility_set_table_properties` directly for tables requiring non-standard configuration. Default: `"silver"` |
+# | `layer` | string | The medallion layer for all tables in this Lakehouse. Accepts `"bronze"`, `"silver"`, or `"gold"`. `"custom"` is not supported — use `doctor_prevention_set_table_properties` directly for tables requiring non-standard configuration. Default: `"silver"` |
 
 
 # MARKDOWN ********************
@@ -160,7 +160,7 @@ def list_delta_tables(workspace_guid, lakehouse_guid):
 # MARKDOWN ********************
 
 # ## Orchestration
-# Iterates all tables in the Lakehouse and calls `dopt_utility_set_table_properties` for
+# Iterates all tables in the Lakehouse and calls `doctor_prevention_set_table_properties` for
 # each. Errors on individual tables are caught and logged — the run continues regardless.
 
 
@@ -182,7 +182,7 @@ for entry in tables:
     display_name = f"{schema_val}.{table_name}" if schema_val else table_name
     try:
         mssparkutils.notebook.run(
-            "dopt_utility_set_table_properties",
+            "doctor_prevention_set_table_properties",
             timeout_seconds=120,
             arguments={
                 "lakehouse_guid": lakehouse_guid,

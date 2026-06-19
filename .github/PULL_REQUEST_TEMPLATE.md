@@ -1,8 +1,8 @@
-## What does this PR do?
+﻿## What does this PR do?
 A clear description of the change and why it's being made.
 
 ## Which notebook(s) does it affect?
-e.g. `dopt_utility_table_maintenance`, `dopt_utility_table_health`, docs only
+e.g. `doctor_treatment_table_maintenance`, `doctor_diagnosis_table_health`, docs only
 
 ## How was it tested?
 Describe what you tested and against what — Fabric Runtime version, table configuration, workload type. Remember: testing must be done against a real Fabric Lakehouse, not a local environment.

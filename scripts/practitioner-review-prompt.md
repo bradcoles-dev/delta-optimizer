@@ -1,6 +1,6 @@
-# Practitioner Review Prompt
+﻿# Practitioner Review Prompt
 
-A structured prompt for evaluating delta-optimizer from the perspective of a Fabric engineer encountering the project for the first time. Run this before any public release or after significant changes to documentation or onboarding flow.
+A structured prompt for evaluating delta-doctor from the perspective of a Fabric engineer encountering the project for the first time. Run this before any public release or after significant changes to documentation or onboarding flow.
 
 ## How to use
 
@@ -13,7 +13,7 @@ The goal is to surface onboarding friction, unclear documentation, and gaps betw
 ## Prompt
 
 ```
-You are a senior Microsoft Fabric engineer. You have solid Fabric and Delta Lake experience but have never seen this project before. You are evaluating delta-optimizer to decide whether to adopt it in your organisation's production Fabric workspace.
+You are a senior Microsoft Fabric engineer. You have solid Fabric and Delta Lake experience but have never seen this project before. You are evaluating delta-doctor to decide whether to adopt it in your organisation's production Fabric workspace.
 
 Your job is to read the project from the outside in — README first, then docs, then notebooks — and report:
 1. Anything that would stop you trusting or adopting the library
@@ -33,13 +33,13 @@ Do NOT flag code style preferences or internal implementation details that are i
 6. `docs/liquid-clustering.md`
 7. `docs/v-order.md`
 8. `validation/deployment-validation.md`
-9. `Notebooks/dopt_utility_session_config.Notebook/notebook-content.py`
-10. `Notebooks/dopt_utility_table_health.Notebook/notebook-content.py`
-11. `Notebooks/dopt_utility_table_maintenance.Notebook/notebook-content.py`
-12. `Notebooks/dopt_utility_maintenance_orchestrator.Notebook/notebook-content.py`
-13. `Notebooks/dopt_utility_set_table_properties.Notebook/notebook-content.py`
-14. `Notebooks/dopt_utility_set_properties_orchestrator.Notebook/notebook-content.py`
-15. `Notebooks/dopt_utility_rebaseline_orchestrator.Notebook/notebook-content.py`
+9. `Notebooks/doctor_prevention_session_config.Notebook/notebook-content.py`
+10. `Notebooks/doctor_diagnosis_table_health.Notebook/notebook-content.py`
+11. `Notebooks/doctor_treatment_table_maintenance.Notebook/notebook-content.py`
+12. `Notebooks/doctor_treatment_maintenance_orchestrator.Notebook/notebook-content.py`
+13. `Notebooks/doctor_prevention_set_table_properties.Notebook/notebook-content.py`
+14. `Notebooks/doctor_prevention_set_properties_orchestrator.Notebook/notebook-content.py`
+15. `Notebooks/doctor_treatment_rebaseline_orchestrator.Notebook/notebook-content.py`
 
 ## What to assess
 

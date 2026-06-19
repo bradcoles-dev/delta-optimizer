@@ -1,7 +1,7 @@
-# delta-optimizer
+﻿# delta-doctor
 
 ## What this project is
-A Fabric Notebook Library of production-ready PySpark notebooks for Delta table maintenance on Microsoft Fabric. All notebooks use the `dopt_` prefix. The GitHub repo is `bradcoles-dev/delta-optimizer`.
+A Fabric Notebook Library of production-ready PySpark notebooks for Delta table maintenance on Microsoft Fabric. All notebooks use the `doctor_` prefix. The GitHub repo is `bradcoles-dev/delta-doctor`.
 
 ## Fabric notebook format
 Every notebook lives in a `Notebooks/<name>.Notebook/` folder containing two files:
@@ -49,8 +49,8 @@ The file must open with:
 ## Design constraints
 
 ### Session config vs table properties
-- `dopt_utility_session_config` sets Spark session configs — they apply only to the current notebook session
-- `dopt_utility_set_table_properties` sets Delta table properties — they persist across sessions and apply regardless of which notebook writes the table
+- `doctor_prevention_session_config` sets Spark session configs — they apply only to the current notebook session
+- `doctor_prevention_set_table_properties` sets Delta table properties — they persist across sessions and apply regardless of which notebook writes the table
 - For tables with multiple writers, table properties are the correct approach
 
 ### Medallion layer targets
@@ -91,7 +91,7 @@ SQL syntax by operation:
 - `ALTER TABLE delta.\`{table_path}\` CLUSTER BY (...)`
 
 ### Table enumeration (orchestrators and table_health)
-Never use `SHOW TABLES` for table enumeration — it requires Lakehouse attachment and does not support schema-enabled Lakehouses. Use `mssparkutils.fs.ls()` with `_delta_log` detection instead. Schema-enabled Lakehouses have a `Tables/{schema}/{table}` structure; non-schema Lakehouses have `Tables/{table}`. The `list_delta_tables()` function handles both by checking whether each top-level directory contains `_delta_log` (table) or not (schema folder, recurse one level). This function is defined identically in `dopt_utility_table_health`, `dopt_utility_maintenance_orchestrator`, and `dopt_utility_set_properties_orchestrator`.
+Never use `SHOW TABLES` for table enumeration — it requires Lakehouse attachment and does not support schema-enabled Lakehouses. Use `mssparkutils.fs.ls()` with `_delta_log` detection instead. Schema-enabled Lakehouses have a `Tables/{schema}/{table}` structure; non-schema Lakehouses have `Tables/{table}`. The `list_delta_tables()` function handles both by checking whether each top-level directory contains `_delta_log` (table) or not (schema folder, recurse one level). This function is defined identically in `doctor_diagnosis_table_health`, `doctor_treatment_maintenance_orchestrator`, and `doctor_prevention_set_properties_orchestrator`.
 
 The duplication is intentional — each notebook must be self-contained so practitioners can import any single notebook without external dependencies. At v1.0 (Python package), `list_delta_tables()` moves into the package and the notebooks become thin imports.
 
@@ -101,7 +101,7 @@ Enabling `delta.enableDeletionVectors` upgrades the Delta table protocol. Always
 ### Liquid clustering
 - `ALTER TABLE ... CLUSTER BY (...)` enables clustering but does not physically cluster data
 - OPTIMIZE must run to apply clustering physically
-- Do not enable on partitioned tables — `dopt_utility_set_table_properties` enforces this with a `DESCRIBE DETAIL` check and raises `ValueError` with a migration hint if partition columns are present
+- Do not enable on partitioned tables — `doctor_prevention_set_table_properties` enforces this with a `DESCRIBE DETAIL` check and raises `ValueError` with a migration hint if partition columns are present
 
 ## Notebook structure (follow this order)
 1. File header (`# Fabric notebook source` + opening METADATA)
@@ -114,13 +114,13 @@ Enabling `delta.enableDeletionVectors` upgrades the Delta table protocol. Always
 ## Existing notebooks
 | Notebook | Responsibility |
 |---|---|
-| `dopt_utility_session_config` | Spark session baseline by layer |
-| `dopt_utility_table_health` | Health report across all tables in a Lakehouse |
-| `dopt_utility_table_maintenance` | OPTIMIZE + VACUUM on a single table |
-| `dopt_utility_maintenance_orchestrator` | OPTIMIZE + VACUUM across all tables in a Lakehouse |
-| `dopt_utility_set_table_properties` | Delta table properties + liquid clustering on a single table |
-| `dopt_utility_set_properties_orchestrator` | Table properties across all tables in a Lakehouse |
-| `dopt_utility_rebaseline_orchestrator` | One-off REORG TABLE APPLY (PURGE) + OPTIMIZE across all tables in a Lakehouse to reset file sizes to the layer target |
+| `doctor_prevention_session_config` | Spark session baseline by layer |
+| `doctor_diagnosis_table_health` | Health report across all tables in a Lakehouse |
+| `doctor_treatment_table_maintenance` | OPTIMIZE + VACUUM on a single table |
+| `doctor_treatment_maintenance_orchestrator` | OPTIMIZE + VACUUM across all tables in a Lakehouse |
+| `doctor_prevention_set_table_properties` | Delta table properties + liquid clustering on a single table |
+| `doctor_prevention_set_properties_orchestrator` | Table properties across all tables in a Lakehouse |
+| `doctor_treatment_rebaseline_orchestrator` | One-off REORG TABLE APPLY (PURGE) + OPTIMIZE across all tables in a Lakehouse to reset file sizes to the layer target |
 
 ## What not to do
 - Do not write plain `.py` files — all code lives in Fabric notebook format

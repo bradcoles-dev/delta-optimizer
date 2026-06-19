@@ -11,7 +11,7 @@
 
 # MARKDOWN ********************
 
-# # dopt_utility_table_health
+# # doctor_diagnosis_table_health
 # ## Purpose
 # Scans all tables in a Lakehouse and produces a health report — file counts,
 # average file sizes, fragmentation status, deletion vector state, and clustering
@@ -79,7 +79,7 @@ custom_target_mb = 0        # Custom mode only: target file size in MB for statu
 # - `Skip - empty table` — table has no files; may be freshly created or fully vacuumed
 # - `Skip - single file` — table has one file; nothing to compact (trivially small or already fully compacted)
 # - `No target set` — custom mode with no target specified; raw metrics only
-# - `Oversized` — average file size exceeds 2× target; run `dopt_utility_rebaseline_orchestrator` to rewrite and right-size all files. Note: average file size is a proxy — a bimodal mix of small and large files may not be detected
+# - `Oversized` — average file size exceeds 2× target; run `doctor_treatment_rebaseline_orchestrator` to rewrite and right-size all files. Note: average file size is a proxy — a bimodal mix of small and large files may not be detected
 # - `Healthy` — average file size is at or above target and within 2× target
 # - `Review` — average file size is between 50% and 100% of target; monitor. Tables between 50% and 80% of target will receive OPTIMIZE from the maintenance notebooks; tables between 80% and 100% will be skipped
 # - `Needs OPTIMIZE` — average file size is below 50% of target; priority

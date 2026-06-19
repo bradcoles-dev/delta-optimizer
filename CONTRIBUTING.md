@@ -1,4 +1,4 @@
-# Contributing to delta-optimizer
+﻿# Contributing to delta-doctor
 
 Thank you for your interest in contributing. This project is an open-source Fabric Notebook Library for Delta table maintenance on Microsoft Fabric, and real-world feedback from practitioners using it in production is especially valuable.
 
@@ -59,7 +59,7 @@ Check the [Roadmap](./README.md#roadmap) in the README first — your idea may a
 ### Documentation conventions
 
 - Reference docs live in `docs/` — update the relevant doc if your change affects documented behaviour
-- Keep the `docs/medallion-recommendations.md` quick reference in sync with any setting changes — the source of truth is `LAYER_PROPERTIES` in `dopt_utility_set_table_properties` and the baseline cell in `dopt_utility_session_config`
+- Keep the `docs/medallion-recommendations.md` quick reference in sync with any setting changes — the source of truth is `LAYER_PROPERTIES` in `doctor_prevention_set_table_properties` and the baseline cell in `doctor_prevention_session_config`
 
 ---
 

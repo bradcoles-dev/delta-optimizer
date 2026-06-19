@@ -1,4 +1,4 @@
-# V-Order
+﻿# V-Order
 
 ## What It Is
 
@@ -88,7 +88,7 @@ OPTIMIZE '{table_path}' ZORDER BY (customer_id) VORDER;
 
 ## Note on the Session Config Notebook
 
-V-Order is set explicitly to `false` as a baseline in `dopt_utility_session_config`. Since it is off by default in new workspaces, the explicit set establishes a known baseline regardless of workspace age or history. Enable it on top of this baseline:
+V-Order is set explicitly to `false` as a baseline in `doctor_prevention_session_config`. Since it is off by default in new workspaces, the explicit set establishes a known baseline regardless of workspace age or history. Enable it on top of this baseline:
 - As a session config override at the top of Gold notebooks
 - As a table property on individual Silver/Gold tables that are Direct Lake or SQL Endpoint sources
 

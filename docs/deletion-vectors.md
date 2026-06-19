@@ -1,4 +1,4 @@
-# Deletion Vectors
+﻿# Deletion Vectors
 
 ## What They Are
 
@@ -52,7 +52,7 @@ After running this, note the completion timestamp — that is the reference poin
 
 ## How to Enable
 
-**Using delta-optimizer:** Pass `lakehouse_guid`, `table_name`, and `layer` to `dopt_utility_set_table_properties`. Deletion vectors are enabled by default for all layers. Run `dopt_utility_set_properties_orchestrator` to enable across all tables in a Lakehouse at once.
+**Using delta-doctor:** Pass `lakehouse_guid`, `table_name`, and `layer` to `doctor_prevention_set_table_properties`. Deletion vectors are enabled by default for all layers. Run `doctor_prevention_set_properties_orchestrator` to enable across all tables in a Lakehouse at once.
 
 **Manually via SQL:** (`{table_path}` = `abfss://{workspace_guid}@onelake.dfs.fabric.microsoft.com/{lakehouse_guid}/Tables/{table_name}`)
 

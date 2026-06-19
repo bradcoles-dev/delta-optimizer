@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>delta-doctor | Delta table maintenance for Microsoft Fabric</title>
+  <meta name="description" content="Production-ready Delta table maintenance for Microsoft Fabric. Automated OPTIMIZE, VACUUM, and table property management across Bronze, Silver, and Gold Lakehouse layers.">
+
+  <meta property="og:title" content="delta-doctor | Delta table maintenance for Microsoft Fabric">
+  <meta property="og:description" content="Production-ready Delta table maintenance for Microsoft Fabric. Automated OPTIMIZE, VACUUM, and table property management across Bronze, Silver, and Gold Lakehouse layers.">
+  <meta property="og:url" content="https://deltadoctor.dev">
+  <meta property="og:type" content="website">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "delta-doctor",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Microsoft Fabric",
+    "softwareVersion": "0.1",
+    "url": "https://deltadoctor.dev",
+    "license": "https://www.apache.org/licenses/LICENSE-2.0",
+    "author": {
+      "@type": "Person",
+      "name": "Brad Coles",
+      "url": "https://bradcoles.dev"
+    }
+  }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Press+Start+2P&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #0a0e1a;
+      --bg-card: #111827;
+      --text-primary: #e5e7eb;
+      --text-secondary: #9ca3af;
+      --accent: #3b82f6;
+      --accent-bright: #60a5fa;
+      --accent-dim: #1e40af;
+      --success: #10b981;
+      --border: #1f2937;
+      --code-bg: #0d1117;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      line-height: 1.7;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      animation: gridMove 20s linear infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes gridMove {
+      0%   { transform: translate(0, 0); }
+      100% { transform: translate(50px, 50px); }
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes scanline {
+      0%   { left: -45%; }
+      100% { left: 110%; }
+    }
+
+    .fade-in {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    header,
+    main,
+    footer {
+      position: relative;
+      z-index: 1;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    header {
+      padding: 5rem 0 4rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: -45%;
+      width: 40%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-bright), transparent);
+      animation: scanline 4s ease-in-out infinite;
+    }
+
+    header h1 {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(1.3rem, 4vw, 2rem);
+      color: var(--accent-bright);
+      line-height: 1.4;
+      margin-bottom: 1.5rem;
+      text-shadow: 0 0 40px rgba(96, 165, 250, 0.35);
+      animation: fadeInUp 0.8s ease both;
+    }
+
+    .tagline {
+      font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+      color: var(--text-secondary);
+      max-width: 540px;
+      margin: 0 auto 2rem;
+      animation: fadeInUp 0.8s 0.15s ease both;
+    }
+
+    .cta-group {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+      animation: fadeInUp 0.8s 0.3s ease both;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.65rem 1.4rem;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-bright);
+      border-color: var(--accent-bright);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--accent-bright);
+      border-color: var(--accent-dim);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent-bright);
+      transform: translateY(-2px);
+    }
+
+    .tag {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--success);
+      border: 1px solid var(--success);
+      border-radius: 4px;
+      padding: 0.28rem 0.7rem;
+      animation: fadeInUp 0.8s 0.45s ease both;
+    }
+
+    section {
+      padding: 4.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .section-heading {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(1.6rem, 3.5vw, 2.1rem);
+      color: var(--text-primary);
+      margin-bottom: 1rem;
+    }
+
+    .section-intro {
+      color: var(--text-secondary);
+      max-width: 660px;
+      margin-bottom: 2.5rem;
+      line-height: 1.8;
+    }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .problem-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+
+    .problem-icon {
+      display: block;
+      font-size: 1.3rem;
+      margin-bottom: 0.7rem;
+    }
+
+    .problem-card h3 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      margin-bottom: 0.45rem;
+    }
+
+    .problem-card p {
+      font-size: 0.83rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    .pillars {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .pillar-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .pillar-card:hover {
+      border-color: var(--accent-dim);
+      transform: translateY(-3px);
+    }
+
+    .pillar-number {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      margin-bottom: 0.4rem;
+    }
+
+    .pillar-card h3 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: var(--text-primary);
+      margin-bottom: 0.65rem;
+    }
+
+    .pillar-desc {
+      font-size: 0.83rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 1.25rem;
+    }
+
+    .notebook-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .notebook-list li {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .notebook-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--accent-bright);
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 0.2rem 0.5rem;
+      border-radius: 3px;
+      display: inline-block;
+      width: fit-content;
+    }
+
+    .notebook-purpose {
+      font-size: 0.79rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      padding-left: 0.15rem;
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      max-width: 700px;
+    }
+
+    .step {
+      display: flex;
+      gap: 1.25rem;
+      align-items: flex-start;
+    }
+
+    .step-number {
+      flex-shrink: 0;
+      width: 2.2rem;
+      height: 2.2rem;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      border: 1px solid var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: var(--accent-bright);
+    }
+
+    .step-body h3 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--text-primary);
+      margin-bottom: 0.3rem;
+    }
+
+    .step-body p {
+      font-size: 0.83rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    .step-body code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      color: var(--accent-bright);
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+    }
+
+    .prereqs {
+      margin-top: 2rem;
+      max-width: 700px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent-dim);
+      border-radius: 0 6px 6px 0;
+      padding: 0.9rem 1.2rem;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    .prereqs strong {
+      color: var(--text-primary);
+    }
+
+    footer {
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      padding: 2rem 0;
+      text-align: center;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 1.25rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      align-items: center;
+    }
+
+    .footer-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--accent-bright);
+    }
+
+    .footer-sep {
+      color: var(--border);
+      user-select: none;
+    }
+
+    @media (max-width: 768px) {
+      header {
+        padding: 3.5rem 0 3rem;
+      }
+
+      section {
+        padding: 3rem 0;
+      }
+
+      .pillars {
+        grid-template-columns: 1fr;
+      }
+
+      .problem-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="container">
+      <h1>delta-doctor</h1>
+      <p class="tagline">Production-ready Delta table maintenance for Microsoft Fabric.</p>
+      <div class="cta-group">
+        <a href="https://github.com/bradcoles-dev/delta-doctor" class="btn btn-primary" aria-label="View delta-doctor on GitHub">View on GitHub</a>
+        <a href="https://bradcoles.dev/blog/fabric-delta-table-maintenance.html" class="btn btn-secondary" aria-label="Read the Delta table maintenance guide">Read the guide</a>
+      </div>
+      <span class="tag">v0.1 — ready to deploy</span>
+    </div>
+  </header>
+
+  <main>
+
+    <section aria-labelledby="problem-heading">
+      <div class="container">
+        <p class="section-label fade-in">The Problem</p>
+        <h2 class="section-heading fade-in" id="problem-heading">Silent cost inflation</h2>
+        <p class="section-intro fade-in">Fabric capacity SKUs double in cost at every tier. Poor Delta table maintenance silently inflates that cost — not because you have more data or more users, but because the tables have never been properly maintained. This is not a data volume problem. It is a maintenance problem.</p>
+        <div class="problem-grid">
+          <div class="problem-card fade-in">
+            <span class="problem-icon" aria-hidden="true">📂</span>
+            <h3>Small files accumulate</h3>
+            <p>Every micro-batch write, Dataflow, or Copy activity lands small files. Without compaction, queries open thousands of files instead of dozens.</p>
+          </div>
+          <div class="problem-card fade-in">
+            <span class="problem-icon" aria-hidden="true">🗑️</span>
+            <h3>Deletion vectors build up</h3>
+            <p>MERGE and DELETE operations write deletion vector files rather than rewriting data. They accumulate silently and slow every subsequent read.</p>
+          </div>
+          <div class="problem-card fade-in">
+            <span class="problem-icon" aria-hidden="true">🔍</span>
+            <h3>Queries scan more than needed</h3>
+            <p>Stale liquid clustering and oversized files mean the SQL Analytics Endpoint and Direct Lake scan far more data than necessary on every query.</p>
+          </div>
+          <div class="problem-card fade-in">
+            <span class="problem-icon" aria-hidden="true">💸</span>
+            <h3>Capacity SKUs double at every tier</h3>
+            <p>An F64 costs twice an F32. A poorly maintained Lakehouse can force you to the next SKU when the real fix is a VACUUM and an OPTIMIZE.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="how-heading">
+      <div class="container">
+        <p class="section-label fade-in">How it works</p>
+        <h2 class="section-heading fade-in" id="how-heading">Three pillars of maintenance</h2>
+        <p class="section-intro fade-in">delta-doctor is organised around Diagnosis, Treatment, and Preventative Care — seven notebooks you import directly into your Fabric workspace. No package manager, no infrastructure, no configuration files.</p>
+        <div class="pillars">
+
+          <article class="pillar-card fade-in" aria-labelledby="pillar-diagnosis">
+            <p class="pillar-number">01</p>
+            <h3 id="pillar-diagnosis">Diagnosis</h3>
+            <p class="pillar-desc">Understand what your tables look like before you change anything.</p>
+            <ul class="notebook-list">
+              <li>
+                <span class="notebook-name">doctor_diagnosis_table_health</span>
+                <span class="notebook-purpose">Scans all tables in a Lakehouse and produces a health report — file counts, average file sizes, fragmentation status, deletion vector state, and clustering state. Classifies each table as Healthy, Review, Needs OPTIMIZE, Oversized, or a skip status.</span>
+              </li>
+            </ul>
+          </article>
+
+          <article class="pillar-card fade-in" aria-labelledby="pillar-treatment">
+            <p class="pillar-number">02</p>
+            <h3 id="pillar-treatment">Treatment</h3>
+            <p class="pillar-desc">Fix what is broken and restore tables to a healthy baseline.</p>
+            <ul class="notebook-list">
+              <li>
+                <span class="notebook-name">doctor_treatment_table_maintenance</span>
+                <span class="notebook-purpose">Runs OPTIMIZE and VACUUM on a single table. Called as the final step of each pipeline load.</span>
+              </li>
+              <li>
+                <span class="notebook-name">doctor_treatment_maintenance_orchestrator</span>
+                <span class="notebook-purpose">Iterates all tables in a Lakehouse, running OPTIMIZE and VACUUM on each. Scheduled pipeline for Lakehouse-wide maintenance.</span>
+              </li>
+              <li>
+                <span class="notebook-name">doctor_treatment_rebaseline_orchestrator</span>
+                <span class="notebook-purpose">Runs REORG TABLE APPLY (PURGE) followed by OPTIMIZE on every table, rewriting files to the layer target and purging deletion vectors. One-off rebaseline for a neglected Lakehouse.</span>
+              </li>
+            </ul>
+          </article>
+
+          <article class="pillar-card fade-in" aria-labelledby="pillar-prevention">
+            <p class="pillar-number">03</p>
+            <h3 id="pillar-prevention">Preventative Care</h3>
+            <p class="pillar-desc">Configure tables and sessions correctly so problems do not reoccur.</p>
+            <ul class="notebook-list">
+              <li>
+                <span class="notebook-name">doctor_prevention_session_config</span>
+                <span class="notebook-purpose">Sets up a Spark session with the correct baseline configurations for a given medallion layer. Called at the top of every pipeline notebook.</span>
+              </li>
+              <li>
+                <span class="notebook-name">doctor_prevention_set_table_properties</span>
+                <span class="notebook-purpose">Sets Delta table properties by layer on a single table — deletion vectors, auto-compaction, optimise write, V-Order, and target file size. Optionally enables liquid clustering.</span>
+              </li>
+              <li>
+                <span class="notebook-name">doctor_prevention_set_properties_orchestrator</span>
+                <span class="notebook-purpose">Iterates all tables in a Lakehouse and applies table properties for each. Run once per Lakehouse at onboarding time.</span>
+              </li>
+            </ul>
+          </article>
+
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="started-heading">
+      <div class="container">
+        <p class="section-label fade-in">Getting Started</p>
+        <h2 class="section-heading fade-in" id="started-heading">Up and running in three steps</h2>
+        <p class="section-intro fade-in">No package manager. No configuration files. Import and run.</p>
+        <ol class="steps" aria-label="Setup steps">
+          <li class="step fade-in">
+            <div class="step-number" aria-hidden="true">1</div>
+            <div class="step-body">
+              <h3>Download or clone the repository</h3>
+              <p>Clone <code>bradcoles-dev/delta-doctor</code> from GitHub, or download the ZIP and extract it locally.</p>
+            </div>
+          </li>
+          <li class="step fade-in">
+            <div class="step-number" aria-hidden="true">2</div>
+            <div class="step-body">
+              <h3>Import the notebooks into your Fabric workspace</h3>
+              <p>Open the Data Engineering experience in Microsoft Fabric and use <strong>Import notebook</strong> to upload the notebooks. All notebooks must reside in the same workspace as the target Lakehouse.</p>
+            </div>
+          </li>
+          <li class="step fade-in">
+            <div class="step-number" aria-hidden="true">3</div>
+            <div class="step-body">
+              <h3>Run <code>doctor_diagnosis_table_health</code> first</h3>
+              <p>Pass <code>lakehouse_guid</code> as a parameter and run it to see the current state of your tables before changing anything. Your Lakehouse GUID is visible in the browser URL when the Lakehouse is open in Fabric.</p>
+            </div>
+          </li>
+        </ol>
+        <div class="prereqs fade-in" role="note">
+          <strong>Prerequisites:</strong> Microsoft Fabric workspace, Lakehouse, Spark Runtime 1.3 or later.
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="container">
+      <nav class="footer-links" aria-label="Footer">
+        <span>Built by <a href="https://bradcoles.dev">Brad Coles</a></span>
+        <span class="footer-sep" aria-hidden="true">|</span>
+        <span>Apache 2.0 Licence</span>
+        <span class="footer-sep" aria-hidden="true">|</span>
+        <a href="https://github.com/bradcoles-dev/delta-doctor" aria-label="delta-doctor on GitHub">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>

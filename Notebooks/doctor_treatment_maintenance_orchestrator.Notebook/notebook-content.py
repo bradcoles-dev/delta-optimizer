@@ -57,7 +57,8 @@
 
 lakehouse_guid = ""        # The GUID of the Lakehouse to maintain
 layer          = "silver"  # Medallion layer: "bronze", "silver", or "gold". Must match the layer of all tables in this Lakehouse — all tables share one target
-force_vacuum   = False     # Set True to trigger VACUUM regardless of day of week
+force_vacuum          = False  # Set True to trigger VACUUM regardless of day of week
+direct_lake_confirmed = False  # Gold only: set True to confirm the Power BI semantic model has re-framed before VACUUM runs
 
 # METADATA ********************
 
@@ -74,6 +75,7 @@ force_vacuum   = False     # Set True to trigger VACUUM regardless of day of wee
 # | `lakehouse_guid` | string | The GUID of the Lakehouse to maintain. Found in the Lakehouse URL in the Fabric portal |
 # | `layer` | string | Medallion layer for all tables in this Lakehouse. Accepts `"bronze"`, `"silver"`, or `"gold"`. `"custom"` is not supported — all tables in a Lakehouse share the same layer. Default: `"silver"`. For Lakehouses where individual tables need different target sizes, call `doctor_treatment_table_maintenance` directly with `layer = "custom"` |
 # | `force_vacuum` | boolean | When `True`, VACUUM runs on all tables regardless of day. Use after large backfills or initial loads. Default: `False` |
+# | `direct_lake_confirmed` | boolean | **Gold layer only.** Set `True` to confirm the Power BI semantic model has re-framed to the latest Delta commit before VACUUM runs. Required whenever VACUUM is triggered on a Gold Lakehouse — notebook raises `ValueError` if `False`. Default: `False` |
 
 
 # MARKDOWN ********************
@@ -97,7 +99,8 @@ if not layer or layer.lower() not in valid_layers:
 layer     = layer.lower()
 target_mb = LAYER_TARGETS[layer]
 
-force_vacuum   = str(force_vacuum).lower() == "true"
+force_vacuum          = str(force_vacuum).lower() == "true"
+direct_lake_confirmed = str(direct_lake_confirmed).lower() == "true"
 
 workspace_guid = spark.conf.get("trident.workspace.id")
 
@@ -243,6 +246,14 @@ from datetime import datetime, timezone
 is_sunday  = datetime.now(timezone.utc).weekday() == 6  # 6 = Sunday (UTC)
 run_vacuum = force_vacuum or is_sunday
 
+if run_vacuum and layer == "gold" and not direct_lake_confirmed:
+    raise ValueError(
+        "Direct Lake gate — set direct_lake_confirmed = True to confirm the Power BI "
+        "semantic model has re-framed to the latest Delta commit before VACUUM runs. "
+        "If VACUUM removes files the model still references, Direct Lake users will "
+        "encounter query errors until the next model refresh."
+    )
+
 tables = list_delta_tables(workspace_guid, lakehouse_guid)
 
 optimized_count       = 0
@@ -274,8 +285,6 @@ for entry in tables:
             skipped_count += 1
 
         if run_vacuum:
-            if layer == "gold":
-                print(f"  {display_name}: Direct Lake reminder — confirm semantic model refreshed before VACUUM runs")
             vacuum_table(table_path, display_name)
             vacuumed_count += 1
 

@@ -82,8 +82,9 @@ custom_target_mb = 0        # Custom mode only: target file size in MB for statu
 # - `Skip - single file` — table has one file; nothing to compact (trivially small or already fully compacted)
 # - `No target set` — custom mode with no target specified; raw metrics only
 # - `Oversized` — average file size exceeds 2× target; run `doctor_treatment_rebaseline_orchestrator` to rewrite and right-size all files. Note: average file size is a proxy — a bimodal mix of small and large files may not be detected
-# - `Healthy` — average file size is at or above target and within 2× target. Note: average file size is a proxy — a bimodal mix of small and large files may appear Healthy on average
-# - `Review` — average file size is between 50% and 100% of target; monitor. Tables between 50% and 80% of target will receive OPTIMIZE from the maintenance notebooks; tables between 80% and 100% will be skipped
+# - `Healthy` — average file size is at or above target (100%–200%). Maintenance notebooks will skip
+# - `Within tolerance` — average file size is 80%–100% of target; within the maintenance skip threshold. No action needed. Note: average file size is a proxy — a bimodal mix of small and large files may appear healthy on average
+# - `Review` — average file size is 50%–80% of target; maintenance notebooks will run OPTIMIZE on the next scheduled run
 # - `Needs OPTIMIZE` — average file size is below 50% of target; priority
 
 
@@ -204,6 +205,8 @@ for entry in tables:
             status = "Oversized"
         elif avg_mb >= target_mb:
             status = "Healthy"
+        elif avg_mb >= target_mb * 0.8:
+            status = "Within tolerance"
         elif avg_mb >= target_mb / 2:
             status = "Review"
         else:

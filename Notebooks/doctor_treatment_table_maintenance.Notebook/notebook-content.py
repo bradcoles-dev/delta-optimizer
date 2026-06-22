@@ -57,7 +57,8 @@ table_name       = ""        # The table name (without schema prefix), e.g. "fac
 schema_name      = ""        # Schema name for schema-enabled Lakehouses. Leave empty for non-schema Lakehouses
 layer            = "silver"  # Medallion layer: "bronze", "silver", "gold", or "custom"
 custom_target_mb = 0         # Custom mode only: target file size in MB for OPTIMIZE gating. Required when layer = "custom"
-force_vacuum     = False     # Set True in the pipeline to trigger VACUUM outside the weekly schedule
+force_vacuum          = False  # Set True in the pipeline to trigger VACUUM outside the weekly schedule
+direct_lake_confirmed = False  # Gold only: set True to confirm the Power BI semantic model has re-framed before VACUUM runs
 
 # METADATA ********************
 
@@ -77,6 +78,7 @@ force_vacuum     = False     # Set True in the pipeline to trigger VACUUM outsid
 # | `layer` | string | Medallion layer for the table. Accepts `"bronze"`, `"silver"`, `"gold"`, or `"custom"`. Default: `"silver"` |
 # | `custom_target_mb` | integer | **Custom mode only.** Target file size in MB for OPTIMIZE gating. Required when `layer = "custom"` |
 # | `force_vacuum` | boolean | When `True`, VACUUM runs regardless of the day of the week. Use for ad-hoc runs after large backfills or initial loads. Default: `False` |
+# | `direct_lake_confirmed` | boolean | **Gold layer only.** Set `True` to confirm the Power BI semantic model has re-framed to the latest Delta commit before VACUUM runs. Required whenever VACUUM is triggered on a Gold table — notebook raises `ValueError` if `False`. Default: `False` |
 # ### Why different targets per layer?
 # - **Silver (256 MB):** Intermediate layer — balances write and read performance for Spark processing
 # - **Gold (400 MB):** Consumption layer — the SQL Analytics Endpoint and Power BI Direct Lake
@@ -121,7 +123,8 @@ if layer == "custom":
 else:
     target_mb = LAYER_TARGETS[layer]
 
-force_vacuum   = str(force_vacuum).lower() == "true"
+force_vacuum          = str(force_vacuum).lower() == "true"
+direct_lake_confirmed = str(direct_lake_confirmed).lower() == "true"
 
 workspace_guid = spark.conf.get("trident.workspace.id")
 onelake_base   = f"abfss://{workspace_guid}@onelake.dfs.fabric.microsoft.com/{lakehouse_guid}/Tables"
@@ -318,8 +321,13 @@ optimize_if_needed(table_path, display_name, target_mb=target_mb)
 from datetime import datetime, timezone
 
 if force_vacuum or datetime.now(timezone.utc).weekday() == 6:  # 6 = Sunday (UTC)
-    if layer == "gold":
-        print(f"{display_name}: Direct Lake reminder — confirm the Power BI semantic model has been refreshed before VACUUM runs")
+    if layer == "gold" and not direct_lake_confirmed:
+        raise ValueError(
+            f"{display_name}: Direct Lake gate — set direct_lake_confirmed = True to confirm "
+            "the Power BI semantic model has re-framed to the latest Delta commit before VACUUM "
+            "runs. If VACUUM removes files the model still references, Direct Lake users will "
+            "encounter query errors until the next model refresh."
+        )
     vacuum_table(table_path, display_name)
 
 # METADATA ********************

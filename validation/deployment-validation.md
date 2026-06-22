@@ -279,7 +279,7 @@ Select a table showing `Needs OPTIMIZE` in the `doctor_diagnosis_table_health` o
 - Y is meaningfully lower than X; B is closer to the layer target
 
 ### 5.2 — Healthy table (OPTIMIZE expected to skip)
-Select a table showing `Healthy` in the health report.
+Select a table showing `Healthy` or `Within tolerance` in the health report.
 
 | Parameter | Value |
 |---|---|
@@ -321,6 +321,19 @@ Select a table showing `Healthy` in the health report.
 
 **Error case:** Set `custom_target_mb = 0` with `layer = "custom"`. **Expected:** `ValueError` raised immediately — `custom_target_mb` is required for custom mode.
 
+### 5.6 — Direct Lake gate (Gold layer)
+| Parameter | Value |
+|---|---|
+| `lakehouse_guid` | Your Lakehouse GUID |
+| `table_name` | Any table |
+| `layer` | `gold` |
+| `force_vacuum` | `True` |
+| `direct_lake_confirmed` | `False` (default) |
+
+**Expected:** `ValueError` raised before VACUUM runs, with message explaining the Direct Lake gate and instructing the practitioner to set `direct_lake_confirmed = True`.
+
+**Happy path:** Re-run with `direct_lake_confirmed = True`. **Expected:** VACUUM runs normally — `{table}: VACUUM ran — retained 168h`.
+
 
 ---
 
@@ -341,7 +354,7 @@ Validates Lakehouse-wide maintenance, summary accuracy, and error resilience.
 - Summary: `optimized: X | skipped: Y | vacuumed: 0 | errors: 0 | files compacted: Z` (if not run on a Sunday UTC — on Sunday UTC, VACUUM fires automatically and `vacuumed` equals N; note the day is evaluated in UTC regardless of your local timezone)
 - X + Y = N
 
-**Cross-check:** Re-run `doctor_diagnosis_table_health` — previously fragmented tables should now show `Healthy` or `Review`.
+**Cross-check:** Re-run `doctor_diagnosis_table_health` — previously fragmented tables should now show `Healthy`, `Within tolerance`, or `Review`.
 
 ### 6.2 — Forced VACUUM pass
 | Parameter | Value |
@@ -351,6 +364,18 @@ Validates Lakehouse-wide maintenance, summary accuracy, and error resilience.
 | `force_vacuum` | `True` |
 
 **Expected:** Summary shows `vacuumed: N` where N equals total tables.
+
+### 6.3 — Direct Lake gate (Gold layer)
+| Parameter | Value |
+|---|---|
+| `lakehouse_guid` | Your Lakehouse GUID |
+| `layer` | `gold` |
+| `force_vacuum` | `True` |
+| `direct_lake_confirmed` | `False` (default) |
+
+**Expected:** `ValueError` raised before the table loop starts — no OPTIMIZE or VACUUM runs on any table.
+
+**Happy path:** Re-run with `direct_lake_confirmed = True`. **Expected:** Full run completes normally; summary shows `vacuumed: N`.
 
 ---
 
@@ -375,7 +400,7 @@ Validates the one-off Lakehouse rebaseline. Designed for one-off use — safe to
 - Summary: `rebaselined: N | skipped: 0 | errors: 0 | files compacted: Z`
 - Average file sizes after rebaseline should be near the layer target (256 MB for silver)
 
-**Verify:** Re-run `doctor_diagnosis_table_health` — all non-empty tables should show `Healthy` or `Review`.
+**Verify:** Re-run `doctor_diagnosis_table_health` — all non-empty tables should show `Healthy`, `Within tolerance`, or `Review`.
 
 ### 7.2 — Error resilience
 If any table fails (permissions, external table, etc.), the run continues. The summary error count reflects the failure and all other tables complete normally.

@@ -6,7 +6,7 @@ for direct import into Microsoft Fabric workspaces via the Import notebook butto
 Usage:
     python scripts/build_notebooks.py
 
-Output is written to dist/ at the repo root. Each file is named after its notebook
+Output is written to Notebooks/dist/. Each file is named after its notebook
 directory (e.g. doctor_treatment_maintenance_orchestrator.ipynb) — the filename becomes
 the notebook title when imported into Fabric.
 """
@@ -18,7 +18,7 @@ import sys
 
 REPO_ROOT     = os.path.join(os.path.dirname(__file__), '..')
 NOTEBOOKS_DIR = os.path.join(REPO_ROOT, 'Notebooks')
-DIST_DIR      = os.path.join(REPO_ROOT, 'dist')
+DIST_DIR      = os.path.join(NOTEBOOKS_DIR, 'dist')
 
 NOTEBOOK_METADATA = {
     "a365ComputeOptions": None,
@@ -137,7 +137,7 @@ def main():
         print(f"  {notebook_name}.ipynb")
         generated.append(notebook_name)
 
-    print(f"\nGenerated {len(generated)} notebook(s) in dist/")
+    print(f"\nGenerated {len(generated)} notebook(s) in Notebooks/dist/")
     if errors:
         sys.exit(1)
 

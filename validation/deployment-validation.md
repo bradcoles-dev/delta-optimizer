@@ -182,8 +182,12 @@ delta.targetFileSize = 268435456 (256 MB)
 
 > **Fabric constraint:** Liquid clustering can only be enabled at table creation time. `ALTER TABLE CLUSTER BY` only works to change cluster columns on a table that already has clustering. To enable clustering on an existing table you must use `CREATE OR REPLACE TABLE delta.\`{path}\` CLUSTER BY ({col}) AS SELECT * FROM delta.\`{path}\``. `doctor_prevention_set_table_properties` enforces this with a check on `detail.clusteringColumns` and raises `ValueError` with the migration syntax if clustering is not already enabled.
 
-To test the happy path, first create a clustered test table from a scratch cell:
+To test the happy path, first create a clustered test table from a scratch cell (replace the GUID with your test Lakehouse GUID):
 ```python
+workspace_guid = spark.conf.get("trident.workspace.id")
+lakehouse_guid = "your-test-lakehouse-guid"
+onelake_base   = f"abfss://{workspace_guid}@onelake.dfs.fabric.microsoft.com/{lakehouse_guid}/Tables"
+
 spark.sql(f"""
     CREATE OR REPLACE TABLE delta.`{onelake_base}/doctor_test_clustered`
     CLUSTER BY (id)
@@ -350,7 +354,7 @@ Validates Lakehouse-wide maintenance, summary accuracy, and error resilience.
 
 **Expected:**
 - `Tables found: N` matches the count from `doctor_diagnosis_table_health`
-- Each table logs `skipped` or `OPTIMIZE ran` with file counts
+- Each table logs `skipped` or `OPTIMIZE ran` followed by files and avg size on separate indented lines
 - Summary: `optimized: X | skipped: Y | vacuumed: 0 | errors: 0 | files compacted: Z` (if not run on a Sunday UTC — on Sunday UTC, VACUUM fires automatically and `vacuumed` equals N; note the day is evaluated in UTC regardless of your local timezone)
 - X + Y = N
 

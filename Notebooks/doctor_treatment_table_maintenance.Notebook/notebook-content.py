@@ -201,6 +201,8 @@ def optimize_if_needed(table_path, display_name, target_mb=400, tolerance=0.8):
         if avg_mb_before >= threshold_mb:
             print(f"{display_name}: skipped — avg {avg_mb_before:.0f}MB is within tolerance of {target_mb}MB target")
             return {"result": "skipped"}
+    elif avg_mb_before > target_mb * 2:
+        print(f"{display_name}: note — avg {avg_mb_before:.0f}MB exceeds 2x {target_mb}MB target; consider doctor_treatment_rebaseline_orchestrator after this run")
 
     spark.sql(f"OPTIMIZE '{table_path}'")
 

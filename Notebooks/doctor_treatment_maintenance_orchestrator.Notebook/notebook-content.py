@@ -195,6 +195,8 @@ def optimize_if_needed(table_path, display_name, target_mb=400, tolerance=0.8):
         if avg_mb_before >= threshold_mb:
             print(f"  {display_name}: skipped — avg {avg_mb_before:.0f}MB is within tolerance of {target_mb}MB target")
             return {"result": "skipped"}
+    elif avg_mb_before > target_mb * 2:
+        print(f"  {display_name}: note — avg {avg_mb_before:.0f}MB exceeds 2x {target_mb}MB target; consider doctor_treatment_rebaseline_orchestrator after this run")
 
     spark.sql(f"OPTIMIZE '{table_path}'")
 
@@ -203,7 +205,9 @@ def optimize_if_needed(table_path, display_name, target_mb=400, tolerance=0.8):
     avg_mb_after    = (details_after['sizeInBytes'] / num_files_after) / (1024**2) if num_files_after > 0 else 0
     files_compacted = num_files_before - num_files_after
 
-    print(f"  {display_name}: OPTIMIZE ran — files {num_files_before:,} → {num_files_after:,} ({files_compacted:,} compacted) | avg {avg_mb_before:.0f}MB → {avg_mb_after:.0f}MB")
+    print(f"  {display_name}: OPTIMIZE ran")
+    print(f"    files    : {num_files_before:,} → {num_files_after:,} ({files_compacted:,} compacted)")
+    print(f"    avg size : {avg_mb_before:.0f}MB → {avg_mb_after:.0f}MB")
 
     return {
         "result":          "optimized",

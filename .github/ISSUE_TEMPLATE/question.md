@@ -1,18 +1,9 @@
 ---
 name: Question
-about: Something you are unsure about or want clarification on
-title: '[Question] '
-labels: question
+about: "Note: questions are better handled in Discussions — see the link above"
+title: ''
+labels: ''
 assignees: ''
 ---
 
-**What are you trying to do?**
-Describe your goal or scenario.
-
-**What have you tried?**
-
-**What is unclear?**
-
-**Environment**
-- Fabric Runtime: Runtime 1.3 / Runtime 2.0
-- Lakehouse type: schema-enabled / non-schema
+Please use [GitHub Discussions — Q&A](https://github.com/bradcoles-dev/delta-doctor/discussions/categories/q-a) for questions. Discussions support threading, marking answers, and searching previous questions — a better fit than Issues for support conversations.

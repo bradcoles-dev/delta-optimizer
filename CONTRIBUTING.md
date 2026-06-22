@@ -32,13 +32,13 @@ The more context you provide, the faster the issue can be reproduced and address
 
 ## Suggesting a Feature
 
-Open a GitHub Issue describing:
+Open a [GitHub Discussions — Ideas](https://github.com/bradcoles-dev/delta-doctor/discussions/categories/ideas) thread describing:
 
 1. The problem you are trying to solve
 2. How you currently work around it (if at all)
 3. What you would want the solution to look like
 
-Check the [Roadmap](./README.md#roadmap) in the README first — your idea may already be planned.
+Check the [Roadmap](./README.md#roadmap) in the README first — your idea may already be planned. Discussions let other users upvote ideas, which helps prioritise the roadmap.
 
 ---
 

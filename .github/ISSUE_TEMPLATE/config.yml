@@ -1,1 +1,8 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Feature idea or discussion
+    url: https://github.com/bradcoles-dev/delta-doctor/discussions/categories/ideas
+    about: Use GitHub Discussions to suggest features, vote on ideas, or start an open-ended conversation
+  - name: Question
+    url: https://github.com/bradcoles-dev/delta-doctor/discussions/categories/q-a
+    about: Ask a question about using delta-doctor in your environment
